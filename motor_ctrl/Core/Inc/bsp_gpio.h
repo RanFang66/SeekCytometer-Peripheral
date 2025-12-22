@@ -1,0 +1,80 @@
+/*
+ * bsp_gpio.h
+ *
+ *  Created on: 2025年11月27日
+ *      Author: ranfa
+ */
+
+#ifndef INC_BSP_GPIO_H_
+#define INC_BSP_GPIO_H_
+
+#include "gpio.h"
+
+
+#define CHURN_MOTOR_DIR_GPIO 		(GPIOE)
+#define CHURN_MOTOR_DIR_PIN			(GPIO_PIN_4)
+
+#define CHURN_MOTOR_EN_GPIO			(GPIOE)
+#define CHURN_MOTOR_EN_PIN			(GPIO_PIN_6)
+
+#define COVER_MOTOR_EN_GPIO			(GPIOC)
+#define COVER_MOTOR_EN_PIN			(GPIO_PIN_9)
+
+#define COVER_MOTOR_DIR_GPIO		(GPIOA)
+#define COVER_MOTOR_DIR_PIN			(GPIO_PIN_11)
+
+#define COVER_MOTOR_FG_GPIO			(GPIOA)
+#define COVER_MOTOR_FG_PIN			(GPIO_PIN_12)
+
+
+#define SEAL_MOTOR_EN_GPIO			(GPIOC)
+#define SEAL_MOTOR_EN_PIN			(GPIO_PIN_7)
+
+#define SEAL_MOTOR_DIR_GPIO			(GPIOA)
+#define SEAL_MOTOR_DIR_PIN			(GPIO_PIN_8)
+
+#define SEAL_MOTOR_FG_GPIO			(GPIOA)
+#define SEAL_MOTOR_FG_PIN			(GPIO_PIN_9)
+
+#define LASER_1_EN_GPIO				(GPIOC)
+#define LASER_1_EN_PIN				(GPIO_PIN_5)
+
+#define LASER_2_EN_GPIO				(GPIOA)
+#define LASER_2_EN_PIN				(GPIO_PIN_6)
+
+#define POWER_12V_EN_GPIO			(GPIOB)
+#define POWER_12_EN_PIN				(GPIO_PIN_13)
+
+#define POWER_15V_EN_GPIO			(GPIOB)
+#define POWER_15V_EN_PIN			(GPIO_PIN_12)
+
+#define MCP4728_I2C_SCL_GPIO		(GPIOE)
+#define MCP4728_I2C_SCL_PIN			(GPIO_PIN_13)
+
+#define MCP4728_I2C_SDA_GPIO		(GPIOE)
+#define MCP4728_I2C_SDA_PIN			(GPIO_PIN_12)
+
+#define MCP4728_I2C_LDAC_GPIO		(GPIOE)
+#define MCP4728_I2C_LDAC_PIN		(GPIO_PIN_11)
+
+#define COVER_CLOSED_GPIO			(GPIOD)
+#define COVER_CLOSED_PIN			(GPIO_PIN_0)
+
+#define COVER_ALMOST_CLOSED_GPIO	(GPIOC)
+#define COVER_ALMOST_CLOSED_PIN		(GPIO_PIN_12)
+
+
+#define COVER_ALMOST_OPENED_GPIO	(GPIOC)
+#define COVER_ALMOST_OPENED_PIN		(GPIO_PIN_11)
+
+
+#define COVER_OPENED_GPIO			(GPIOC)
+#define COVER_OPENED_PIN			(GPIO_PIN_10)
+
+#define SEAL_PUSHED_GPIO			(GPIOC)
+#define SEAL_PUSHED_PIN				(GPIO_PIN_8)
+
+
+
+
+#endif /* INC_BSP_GPIO_H_ */

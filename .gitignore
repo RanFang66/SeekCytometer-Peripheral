@@ -1,0 +1,67 @@
+# ================================
+# STM32CubeIDE / Eclipse workspace
+# ================================
+
+# Eclipse / CubeIDE metadata
+.settings/
+.metadata/
+.recommenders/
+*.launch
+
+# Project-specific IDE files (usually machine-dependent)
+*.cproject
+*.project
+
+# ================================
+# Build output directories
+# ================================
+
+Debug/
+Release/
+build/
+out/
+
+# Generated binary files
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.siz
+
+# ================================
+# Temporary & backup files
+# ================================
+
+*~
+*.bak
+*.tmp
+*.log
+*.swp
+*.swo
+
+# ================================
+# OS-specific files
+# ================================
+
+.DS_Store
+Thumbs.db
+
+# ================================
+# CubeIDE / GCC intermediate files
+# ================================
+
+*.o
+*.d
+*.su
+*.cyclo
+*.gcno
+*.gcda
+*.gcov
+
+# ================================
+# User-specific CubeMX files
+# ================================
+
+*.mxuser
+
