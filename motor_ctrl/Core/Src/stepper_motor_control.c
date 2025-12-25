@@ -9,10 +9,28 @@
 #include "stepper_motor_protocol.h"
 #include "debug_shell.h"
 #include "cmsis_os2.h"
+#include <stdbool.h>
 
 static SMotorCtrlCtx_t CtrlCtx[STEPPER_MOTOR_NUM];
 static osMessageQueueId_t SMotorCmdQueue = NULL;
 static osThreadId_t SMotorCtrlThread = NULL;
+
+
+static bool StepperMotor_ErrorOccur(SMotorIndex_t id)
+{
+	return (CtrlCtx[id].statusWord & (SW_BIT_FAULT | SW_BIT_WARNING));
+}
+
+static bool StepperMotor_ReachTarget(SMotorIndex_t id)
+{
+	return (CtrlCtx[id].statusWord & SW_BIT_REACHED);
+}
+
+static bool StepperMotor_ReachHome(SMotorIndex_t id)
+{
+	return (CtrlCtx[id].statusWord & SW_BIT_HOME);
+}
+
 
 
 /*
@@ -239,7 +257,7 @@ static void StepperMotor_FindHome(SMotorIndex_t id)
 		osDelay(500);
 		tcount++;
 		StepperMotor_UpdateStatus(id);
-	} while (tcount < 20 && !(CtrlCtx[id].statusWord & 0x1000));
+	} while (tcount < 20 && !StepperMotor_ReachHome(id));
 	InitMotorToPPMode(id);
 }
 
@@ -247,6 +265,7 @@ static void StepperMotor_Reset(SMotorIndex_t id)
 {
 	InitMotorToPPMode(id);
 }
+
 
 
 
@@ -267,6 +286,20 @@ static void SMotorCtrl_Task(void *arg)
 				StepperMotor_Stop(cmd.motorId);
 				break;
 			case STEPPER_MOTOR_RUN_STEPS:
+				if ((cmd.motorId == MOTOR_X || cmd.motorId == MOTOR_Y) && CtrlCtx[MOTOR_Z].motorPos < 20000) {
+					uint16_t tCount = 0;
+					StepperMotor_RunToPos(MOTOR_Z, 22000);
+					do {
+						osDelay(400);
+						tCount++;
+						StepperMotor_UpdateStatus(MOTOR_Z);
+					} while(tCount < 10 && !StepperMotor_ReachTarget(MOTOR_Z));
+
+					if (CtrlCtx[MOTOR_Z].motorPos < 200000) {
+						continue;
+					}
+				}
+
 				StepperMotor_RunSteps(cmd.motorId, cmd.cmdData);
 				break;
 			case STEPPER_MOTOR_RUN_POS:

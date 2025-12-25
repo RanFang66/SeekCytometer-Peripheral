@@ -515,6 +515,18 @@ void LaserControlCommand(int argc, char *argv[])
 		Laser_SwitchOn(id, val);
 		break;
 
+	case 's':
+	case 'S':
+		if (argc < 4) {
+			Shell_Print("\r\n>> Use laser -s <id> <val>");
+			return;
+		}
+		val = atoi(argv[3]);
+		Laser_SetIntensity(id, val);
+		break;
+
+
+
 	case 'i':
 	case 'I':
 		if (id == LASER_ALL) {
@@ -566,6 +578,16 @@ void LEDControlCommand(int argc, char *argv[])
 		}
 		val = atoi(argv[2]);
 		LED_SwitchOn(val);
+		break;
+
+	case 's':
+	case 'S':
+		if (argc < 3) {
+			Shell_Print("\r\n>> Use led -s <val>");
+			return;
+		}
+		val = atoi(argv[2]);
+		LED_SetIntensity(val);
 		break;
 
 	case 'i':

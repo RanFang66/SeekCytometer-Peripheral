@@ -107,16 +107,16 @@
    - SW_BIT_VOLTAGE_ENABLED     bit4 (0x0010)
    - SW_BIT_QUICK_STOP          bit5 (0x0020)
 */
-#define SW_BIT_READY_TO_SWITCH_ON   (1U << 0) /* 0x0001 */
-#define SW_BIT_SWITCHED_ON          (1U << 1) /* 0x0002 */
-#define SW_BIT_OPERATION_ENABLED    (1U << 2) /* 0x0004 */
-#define SW_BIT_FAULT                (1U << 3) /* 0x0008 */
-#define SW_BIT_VOLTAGE_ENABLED      (1U << 4) /* 0x0010 */
-#define SW_BIT_QUICK_STOP_ACTIVE    (1U << 5) /* 0x0020 */
-#define SW_BIT_SWITCH_ON_DISABLED	(1U << 6)
-#define SW_BIT_WARNING				(1U << 7)
-
-
+#define SW_BIT_READY_TO_SWITCH_ON   (1U << 0) 	/* 0x0001 */
+#define SW_BIT_SWITCHED_ON          (1U << 1) 	/* 0x0002 */
+#define SW_BIT_OPERATION_ENABLED    (1U << 2) 	/* 0x0004 */
+#define SW_BIT_FAULT                (1U << 3) 	/* 0x0008 */
+#define SW_BIT_VOLTAGE_ENABLED      (1U << 4) 	/* 0x0010 */
+#define SW_BIT_QUICK_STOP_ACTIVE    (1U << 5) 	/* 0x0020 */
+#define SW_BIT_SWITCH_ON_DISABLED	(1U << 6) 	/* 0X0040 */
+#define SW_BIT_WARNING				(1U << 7) 	/* 0x0080 */
+#define SW_BIT_REACHED				(1U << 10) 	/* 0x0400 */
+#define SW_BIT_HOME					(1U << 12)	/* 0x1000 */
 
 // Control Mode Definition for REG_CTRL_MODE(0x00B1U)
 #define CTRL_MODE_CIA402 		0x00			// CiA402模式

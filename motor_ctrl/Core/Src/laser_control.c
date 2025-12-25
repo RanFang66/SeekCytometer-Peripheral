@@ -28,7 +28,7 @@ static void InitLaser(LaserIndex_t id, MCP4728_Channel_t ch, GPIO_TypeDef *gpioE
 	laserCtrl[id].intensity = 0;
 
 	// Disable first
-	HAL_GPIO_WritePin(gpioEn, pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(gpioEn, pin, GPIO_PIN_SET);
 }
 
 
@@ -42,17 +42,17 @@ void Laser_SwitchOff(LaserIndex_t id)
 {
 	if (id == LASER_1 || id == LASER_2) {
 		MCP4728_Set_Value(laserCtrl[id].channel, 0);
-		HAL_GPIO_WritePin(laserCtrl[id].gpioEn, laserCtrl[id].pinEn, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(laserCtrl[id].gpioEn, laserCtrl[id].pinEn, GPIO_PIN_SET);
 		laserCtrl[id].intensity = 0;
 		laserCtrl[id].status = LASER_OFF;
 	} else if (id == LASER_ALL) {
 		MCP4728_Set_Value(laserCtrl[0].channel, 0);
-		HAL_GPIO_WritePin(laserCtrl[0].gpioEn, laserCtrl[0].pinEn, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(laserCtrl[0].gpioEn, laserCtrl[0].pinEn, GPIO_PIN_SET);
 		laserCtrl[0].intensity = 0;
 		laserCtrl[0].status = LASER_OFF;
 
 		MCP4728_Set_Value(laserCtrl[1].channel, 0);
-		HAL_GPIO_WritePin(laserCtrl[1].gpioEn, laserCtrl[1].pinEn, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(laserCtrl[1].gpioEn, laserCtrl[1].pinEn, GPIO_PIN_SET);
 		laserCtrl[1].intensity = 0;
 		laserCtrl[1].status = LASER_OFF;
 	}
@@ -63,17 +63,17 @@ void Laser_SwitchOn(LaserIndex_t id, uint16_t val)
 	val = (val > 4095) ? 4095 : val;
 
 	if (id == LASER_1 || id == LASER_2) {
-		HAL_GPIO_WritePin(laserCtrl[id].gpioEn, laserCtrl[id].pinEn, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(laserCtrl[id].gpioEn, laserCtrl[id].pinEn, GPIO_PIN_RESET);
 		MCP4728_Set_Value(laserCtrl[id].channel, val);
 		laserCtrl[id].status = LASER_ON;
 		laserCtrl[id].intensity = val;
 	} else if (id == LASER_ALL) {
-		HAL_GPIO_WritePin(laserCtrl[0].gpioEn, laserCtrl[0].pinEn, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(laserCtrl[0].gpioEn, laserCtrl[0].pinEn, GPIO_PIN_RESET);
 		MCP4728_Set_Value(laserCtrl[0].channel, val);
 		laserCtrl[0].status = LASER_ON;
 		laserCtrl[0].intensity = val;
 
-		HAL_GPIO_WritePin(laserCtrl[1].gpioEn, laserCtrl[1].pinEn, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(laserCtrl[1].gpioEn, laserCtrl[1].pinEn, GPIO_PIN_RESET);
 		MCP4728_Set_Value(laserCtrl[1].channel, val);
 		laserCtrl[1].status = LASER_ON;
 		laserCtrl[1].intensity = val;

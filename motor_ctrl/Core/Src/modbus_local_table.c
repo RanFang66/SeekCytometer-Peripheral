@@ -303,11 +303,11 @@ void MB_CommandParse(void)
 			break;
 
 		case LED_CMD_SWITCH_ON:
-			LED_SwitchOn(laserIntensitySet);
+			LED_SwitchOn(ledIntensitySet);
 			break;
 
 		case LED_CMD_SET_INTENSITY:
-			LED_SetIntensity(laserIntensitySet);
+			LED_SetIntensity(ledIntensitySet);
 			break;
 		default:
 			break;
