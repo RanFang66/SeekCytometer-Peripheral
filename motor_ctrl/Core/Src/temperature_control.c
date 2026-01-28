@@ -320,9 +320,9 @@ static void StopTempCtrl(void)
 	}
 
 	// Disable fan
-	for (uint8_t i = 0; i < COOL_FAN_NUM; ++i) {
-		Fan_Disable(tempCtrl.fan[i]);
-	}
+//	for (uint8_t i = 0; i < COOL_FAN_NUM; ++i) {
+//		Fan_Disable(tempCtrl.fan[i]);
+//	}
 }
 
 static void CoolFanSetting(uint8_t fanEnCh, uint16_t fanSpeed[COOL_FAN_NUM])
@@ -418,7 +418,7 @@ static void TempCtrl_Task(void *arg)
 
 		if (tempCtrl.status == TEMP_CTRL_RUNNING) {
 			// Calculate PID output
-			float out = PID_Compute(tempCtrl.pid, tempCtrl.temp_target, tempCtrl.temp_latest, dt);
+			float out = PID_Compute(tempCtrl.pid, -tempCtrl.temp_target, -tempCtrl.temp_latest, dt);
 
 			// Update control output
 			UpdateTempCtrlOutput((uint16_t)out);

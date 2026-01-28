@@ -60,7 +60,8 @@ void ConfigOneMotor(SMotorIndex_t id)
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_FUNC, DI_FUNC_UNUSED);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_LEVEL, DI_HIGH_VALID);
 	} else if (id == MOTOR_Y) {
-		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_FUNC, DI_FUNC_NEGA_LIMIT);
+//		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_FUNC, DI_FUNC_NEGA_LIMIT);
+		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_FUNC, DI_FUNC_HOME);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_LEVEL, DI_HIGH_VALID);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_FUNC, DI_FUNC_POS_LIMIT);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_LEVEL, DI_HIGH_VALID);
@@ -205,8 +206,8 @@ void SMotorCtrl_Init()
 	CtrlCtx[MOTOR_Y].speed = 50000;
 	CtrlCtx[MOTOR_Y].accSpeed = 100000;
 	CtrlCtx[MOTOR_Y].descSpeed = 100000;
-	CtrlCtx[MOTOR_Y].resetTimeLimit = 10000;
-	CtrlCtx[MOTOR_Y].homeModeType = HOME_MODE_NEGA_LIMIT;
+	CtrlCtx[MOTOR_Y].resetTimeLimit = 18000;
+	CtrlCtx[MOTOR_Y].homeModeType = HOME_MODE_ORIGIN_21;//HOME_MODE_NEGA_LIMIT;
 
 	CtrlCtx[MOTOR_Z].name = 'Z';
 	CtrlCtx[MOTOR_Z].speed = 50000;
@@ -290,7 +291,7 @@ static void SMotorCtrl_Task(void *arg)
 					uint16_t tCount = 0;
 					StepperMotor_RunToPos(MOTOR_Z, 22000);
 					do {
-						osDelay(400);
+						osDelay(500);
 						tCount++;
 						StepperMotor_UpdateStatus(MOTOR_Z);
 					} while(tCount < 10 && !StepperMotor_ReachTarget(MOTOR_Z));
@@ -303,6 +304,21 @@ static void SMotorCtrl_Task(void *arg)
 				StepperMotor_RunSteps(cmd.motorId, cmd.cmdData);
 				break;
 			case STEPPER_MOTOR_RUN_POS:
+				if ((cmd.motorId == MOTOR_X || cmd.motorId == MOTOR_Y) && CtrlCtx[MOTOR_Z].motorPos < 20000) {
+					uint16_t tCount = 0;
+					StepperMotor_RunToPos(MOTOR_Z, 22000);
+					do {
+						osDelay(500);
+						tCount++;
+						StepperMotor_UpdateStatus(MOTOR_Z);
+					} while(tCount < 10 && !StepperMotor_ReachTarget(MOTOR_Z));
+
+					if (CtrlCtx[MOTOR_Z].motorPos < 200000) {
+						continue;
+					}
+				}
+
+
 				StepperMotor_RunToPos(cmd.motorId, cmd.cmdData);
 				break;
 			case STEPPER_MOTOR_FIND_HOME:

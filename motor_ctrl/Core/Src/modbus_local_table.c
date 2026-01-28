@@ -47,6 +47,9 @@ uint16_t ledCmd = 0;
 uint16_t churnSpeedSet = 0;
 uint16_t laserIntensitySet = 0;
 uint16_t ledIntensitySet = 0;
+uint16_t fanChSet = 0;
+uint16_t fanSpeedSet = 0;
+uint16_t fanChSpeedSet[4] = {0};
 
 
 uint16_t coverStatus;
@@ -69,6 +72,7 @@ uint16_t laser2Status;
 uint16_t laser2Intensity;
 uint16_t ledStatus;
 uint16_t ledIntensity;
+uint16_t currentTemp;
 
 void MB_Local_RegInit(void)
 {
@@ -76,8 +80,6 @@ void MB_Local_RegInit(void)
 	MB_Slave_DefineReg(8, &coverCmd);
 	MB_Slave_DefineReg(9, &sealCmd);
 
-	MB_Slave_DefineReg(11, &tempCmd);
-	MB_Slave_DefineReg(12, &tempTargetSet);
 
 
 	MB_Slave_DefineReg(13, &churnCmd);
@@ -95,12 +97,22 @@ void MB_Local_RegInit(void)
 
 
 
+	MB_Slave_DefineReg(22, &tempCmd);
+	MB_Slave_DefineReg(23, &tempTargetSet);
+	MB_Slave_DefineReg(24, &fanChSet);
+	MB_Slave_DefineReg(25, &fanSpeedSet);
+	MB_Slave_DefineReg(26, &fanChSpeedSet[0]);
+	MB_Slave_DefineReg(27, &fanChSpeedSet[1]);
+	MB_Slave_DefineReg(28, &fanChSpeedSet[2]);
+	MB_Slave_DefineReg(29, &fanChSpeedSet[3]);
 
 
-	MB_Slave_DefineReg(48, &coverStatus);
-	MB_Slave_DefineReg(49, &sealStatus);
-	MB_Slave_DefineReg(50, &churnStatus);
-	MB_Slave_DefineReg(51, &tempCtrlStatus);
+	MB_Slave_DefineReg(47, &tempCtrlStatus);
+	MB_Slave_DefineReg(48, &currentTemp);
+
+	MB_Slave_DefineReg(49, &coverStatus);
+	MB_Slave_DefineReg(50, &sealStatus);
+	MB_Slave_DefineReg(51, &churnStatus);
 	MB_Slave_DefineReg(52, &motorXStatus);
 	MB_Slave_DefineReg(53, &motorYStatus);
 	MB_Slave_DefineReg(54, &motorZStatus);
@@ -129,6 +141,8 @@ void MB_UpdateStatus(void)
 	motorXStatus = SMotorCtrl_GetStatus(MOTOR_X);
 	motorYStatus = SMotorCtrl_GetStatus(MOTOR_Y);
 	motorZStatus = SMotorCtrl_GetStatus(MOTOR_Z);
+	float temp = TempCtrl_GetTempLatest();
+	currentTemp = temp * 10;
 
 	uint16_t limitX = SMotorCtrl_GetLimitStatus(MOTOR_X);
 	uint16_t limitY = SMotorCtrl_GetLimitStatus(MOTOR_Y);
@@ -234,6 +248,28 @@ void MB_CommandParse(void)
 		case TEMP_CTRL_CMD_START:
 			TempCtrl_Start(tempTargetSet);
 			break;
+
+		case TEMP_CTRL_SET_TARGET:
+			TempCtrl_SetTarget(tempTargetSet);
+			break;
+
+		case TEMP_CTRL_FAN_SET:
+			TempCtrl_FanSet(fanChSet, fanChSpeedSet);
+			break;
+
+		case TEMP_CTRL_FAN_ENABLE:
+			TempCtrl_EnableFan(fanChSet);
+			break;
+
+		case TEMP_CTRL_FAN_DISABLE:
+			TempCtrl_DisableFan(fanChSet);
+			break;
+
+		case TEMP_CTRL_FAN_SET_SPEED:
+			TempCtrl_SetFanSpeed(fanChSet, fanSpeedSet);
+			break;
+
+
 		case TEMP_CTRL_CMD_RESET:
 			TempCtrl_Reset();
 			break;

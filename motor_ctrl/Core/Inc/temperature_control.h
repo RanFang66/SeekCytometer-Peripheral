@@ -68,8 +68,8 @@ typedef struct {
 	TempCtrlStatus_t 	status;
 } TempCtrlCtx_t;
 
-#define DEFAULT_KP			1.0f
-#define DEFAULT_KI			1.0f
+#define DEFAULT_KP			3.0f
+#define DEFAULT_KI			8.0f
 #define DEFAULT_KD			0.0f
 
 #define DEFAULT_TAU			0.0f
