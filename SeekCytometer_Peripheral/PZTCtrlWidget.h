@@ -87,8 +87,16 @@ public:
 
 private:
     void initDockWidget();
+
+    QSpinBox *spinDriveVoltage;
+    int m_driveVoltage;
+
     PZTMotorWidget *motor1;
     PZTMotorWidget *motor2;
+
+private slots:
+    void onDriveVoltageChanged(int);
+
 };
 
 #endif // PZTCTRLWIDGET_H

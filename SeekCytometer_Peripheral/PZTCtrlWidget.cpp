@@ -202,14 +202,35 @@ void PZTMotorWidget::onSpinTriggerSet()
 
 void PZTCtrlWidget::initDockWidget()
 {
-    QHBoxLayout *mainLayout = new QHBoxLayout();
+    QVBoxLayout *mainLayout = new QVBoxLayout();
+
+    QHBoxLayout *driveVoltageLayout = new QHBoxLayout();
+    spinDriveVoltage = new QSpinBox(this);
+    spinDriveVoltage->setRange(0, 24000);
+    spinDriveVoltage->setValue(0);
+    spinDriveVoltage->setSingleStep(10);
+    driveVoltageLayout->addWidget(new QLabel(tr("Drive Voltage(mV):"), this));
+    driveVoltageLayout->addWidget(spinDriveVoltage);
+    connect(spinDriveVoltage, &QSpinBox::valueChanged, this, &PZTCtrlWidget::onDriveVoltageChanged);
+
+    QHBoxLayout *motorLayout = new QHBoxLayout();
     motor1 = new PZTMotorWidget("Motor-1", 0,  this);
     motor2 = new PZTMotorWidget("Motor-2", 1, this);
-    mainLayout->addWidget(motor1);
-    mainLayout->addWidget(motor2);
+    motorLayout->addWidget(motor1);
+    motorLayout->addWidget(motor2);
     QWidget *mainWidget = new QWidget(this);
+
+    mainLayout->addLayout(driveVoltageLayout);
+    mainLayout->addSpacing(10);
+    mainLayout->addLayout(motorLayout);
     mainWidget->setLayout(mainLayout);
     setWidget(mainWidget);
+}
+
+void PZTCtrlWidget::onDriveVoltageChanged(int)
+{
+    int driveVoltage = spinDriveVoltage->value();
+    ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, PZT_DRIVE_VOLTAGE, driveVoltage);
 }
 
 void PZTMotorWidget::initWidget()

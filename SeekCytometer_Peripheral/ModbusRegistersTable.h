@@ -143,6 +143,8 @@
 #define PZT_MOTOR2_POS_HI               PZT_REG_ADDR(18)
 #define PZT_MOTOR2_POS_LO               PZT_REG_ADDR(19)
 
+#define PZT_DRIVE_VOLTAGE               PZT_REG_ADDR(26)
+
 
 #define CW_COVER_BIT                    0x0001U
 #define CW_SEAL_BIT                     0x0002U
