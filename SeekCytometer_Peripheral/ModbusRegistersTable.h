@@ -133,9 +133,9 @@
 
 #define PZT_MOTOR_SPEED_SET(i)          (PZT_MOTOR1_SPEED_SET+i)
 #define PZT_MOTOR_PERIOD_SET(i)         (PZT_MOTOR1_PERIOD_SET+i)
-#define PZT_MOTOR_POS_SET(i)            (PZT_MOTOR1_POS_SET_HI + i*4)
-#define PZT_MOTOR_STEP_SET(i)           (PZT_MOTOR1_STEP_SET_HI + i*4)
-#define PZT_MOTOR_TRIGGER_SET(i)        (PZT_MOTOR1_TRIGGER_SET + i*4)
+#define PZT_MOTOR_POS_SET(i)            (PZT_MOTOR1_POS_SET_HI + i*5)
+#define PZT_MOTOR_STEP_SET(i)           (PZT_MOTOR1_STEP_SET_HI + i*5)
+#define PZT_MOTOR_TRIGGER_SET(i)        (PZT_MOTOR1_TRIGGER_SET + i*5)
 
 #define PZT_STATUS_WORD                 PZT_REG_ADDR(15)
 #define PZT_MOTOR1_POS_HI               PZT_REG_ADDR(16)

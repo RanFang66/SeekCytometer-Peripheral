@@ -80,8 +80,8 @@ void PZTMotorWidget::onBtnMotorUpClicked()
     uint16_t cmd = MOTOR_CMD(m_id, PZT_CMD_MOVE_REL);
 
     QVector<uint16_t> stepsBytes(2, 0);
-    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x00FF);
-    stepsBytes[1] = (uint16_t)(steps & 0x00FF);
+    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x0000FFFF);
+    stepsBytes[1] = (uint16_t)(steps & 0x0000FFFF);
 
     ModbusMaster::instance().asyncWriteMultipleRegisters(SLAVE_ADDR, PZT_MOTOR_STEP_SET(m_id), stepsBytes);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, PZT_CW, 0);
@@ -93,8 +93,8 @@ void PZTMotorWidget::onBtnMotorDownClicked()
     int steps = spinMotorSteps->value();
     uint16_t cmd = MOTOR_CMD(m_id, PZT_CMD_MOVE_REL);
     QVector<uint16_t> stepsBytes(2, 0);
-    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x00FF);
-    stepsBytes[1] = (uint16_t)(steps & 0x00FF);
+    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x0000FFFF);
+    stepsBytes[1] = (uint16_t)(steps & 0x0000FFFF);
 
     ModbusMaster::instance().asyncWriteMultipleRegisters(SLAVE_ADDR, PZT_MOTOR_STEP_SET(m_id), stepsBytes);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, PZT_CW, 0);
@@ -107,8 +107,8 @@ void PZTMotorWidget::onBtnMotorRunToPos()
     uint16_t cmd = MOTOR_CMD(m_id, PZT_CMD_MOVE_ABS);
 
     QVector<uint16_t> posBytes(2, 0);
-    posBytes[0] = (uint16_t)((pos >> 16) & 0x00FF);
-    posBytes[1] = (uint16_t)(pos & 0x00FF);
+    posBytes[0] = (uint16_t)((pos >> 16) & 0x0000FFFF);
+    posBytes[1] = (uint16_t)(pos & 0x0000FFFF);
     ModbusMaster::instance().asyncWriteMultipleRegisters(SLAVE_ADDR, PZT_MOTOR_POS_SET(m_id), posBytes);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, PZT_CW, 0);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, PZT_CW, cmd);
@@ -121,8 +121,8 @@ void PZTMotorWidget::onBtnMotorPressClicked()
     int triggerDf = spinMotorTrigger->value();
 
     QVector<uint16_t> stepsBytes(2, 0);
-    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x00FF);
-    stepsBytes[1] = (uint16_t)(steps & 0x00FF);
+    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x0000FFFF);
+    stepsBytes[1] = (uint16_t)(steps & 0x0000FFFF);
     ModbusMaster::instance().asyncWriteMultipleRegisters(SLAVE_ADDR, PZT_MOTOR_STEP_SET(m_id), stepsBytes);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, PZT_MOTOR_TRIGGER_SET(m_id), (uint16_t)triggerDf);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, PZT_CW, 0);
@@ -160,8 +160,8 @@ void PZTMotorWidget::onSpinMotorStepsSet()
 {
     int steps = spinMotorSteps->value();
     QVector<uint16_t> stepsBytes(2, 0);
-    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x00FF);
-    stepsBytes[1] = (uint16_t)(steps & 0x00FF);
+    stepsBytes[0] = (uint16_t)((steps >> 16) & 0x0000FFFF);
+    stepsBytes[1] = (uint16_t)(steps & 0x0000FFFF);
 
     ModbusMaster::instance().asyncWriteMultipleRegisters(SLAVE_ADDR, PZT_MOTOR_STEP_SET(m_id), stepsBytes);
 }
@@ -172,8 +172,8 @@ void PZTMotorWidget::onSpinMotorTargetPosSet()
 
 
     QVector<uint16_t> posBytes(2, 0);
-    posBytes[0] = (uint16_t)((pos >> 16) & 0x00FF);
-    posBytes[1] = (uint16_t)(pos & 0x00FF);
+    posBytes[0] = (uint16_t)((pos >> 16) & 0x0000FFFF);
+    posBytes[1] = (uint16_t)(pos & 0x0000FFFF);
 
     ModbusMaster::instance().asyncWriteMultipleRegisters(SLAVE_ADDR, PZT_MOTOR_POS_SET(m_id), posBytes);
 }
