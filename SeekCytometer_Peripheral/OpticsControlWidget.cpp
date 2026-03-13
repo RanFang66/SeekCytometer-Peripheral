@@ -1,8 +1,13 @@
 #include "OpticsControlWidget.h"
 #include <QGridLayout>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QGroupBox>
+#include <QInputDialog>
+#include <QMessageBox>
 #include "ModbusRegistersTable.h"
 #include "ModbusMaster.h"
+#include "database/DatabaseManager.h"
 
 #define MAX_LASER_INTENSITY 3105
 #define MAX_LED_INTENSITY   100
@@ -20,7 +25,10 @@ OpticsControlWidget::OpticsControlWidget(const QString &tilte, QWidget *parent)
     connect(spinLaserIntensity_2, &QSpinBox::valueChanged, this, &OpticsControlWidget::onLaser2IntensityChanged);
     connect(spinLedIntensity, &QSpinBox::valueChanged, this, &OpticsControlWidget::onLedIntensityChanged);
 
-
+    connect(btnDbLoad, &QPushButton::clicked, this, &OpticsControlWidget::onBtnDbLoadClicked);
+    connect(btnDbSave, &QPushButton::clicked, this, &OpticsControlWidget::onBtnDbSaveClicked);
+    connect(btnDbDelete, &QPushButton::clicked, this, &OpticsControlWidget::onBtnDbDeleteClicked);
+    connect(btnDbOverwrite, &QPushButton::clicked, this, &OpticsControlWidget::onBtnDbOverwriteClicked);
 }
 
 void OpticsControlWidget::updateStatus(const QVector<uint16_t> &regs)
@@ -157,18 +165,160 @@ void OpticsControlWidget::onLedIntensityChanged()
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, CW_LED_BIT);
 }
 
+// ---- DB management slots ----
 
+void OpticsControlWidget::onBtnDbLoadClicked()
+{
+    QString name = cmbDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    LaserConfig cfg = m_dao.queryByName(name);
+    if (cfg.id < 0) {
+        QMessageBox::warning(this, tr("Load Failed"),
+                             tr("Laser config \"%1\" not found in database.").arg(name));
+        return;
+    }
+
+    applyLaserConfig(cfg);
+}
+
+void OpticsControlWidget::onBtnDbSaveClicked()
+{
+    bool ok = false;
+    QString name = QInputDialog::getText(this, tr("Save Laser Config"),
+                                         tr("Enter config name:"),
+                                         QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+    name = name.trimmed();
+
+    LaserConfig existing = m_dao.queryByName(name);
+    if (existing.id >= 0) {
+        QMessageBox::warning(this, tr("Save Failed"),
+                             tr("Name \"%1\" already exists. Use \"Overwrite\" to update.").arg(name));
+        return;
+    }
+
+    LaserConfig cfg;
+    cfg.name = name;
+    cfg.laser638nmEnable = btnLaser_1->isChecked();
+    cfg.laser448nmEnable = btnLaser_2->isChecked();
+    cfg.whiteLedEnable = btnLed->isChecked();
+    cfg.laser638nmPower = spinLaserIntensity_1->value();
+    cfg.laser448nmPower = spinLaserIntensity_2->value();
+    cfg.whiteLedPower = spinLedIntensity->value();
+
+    if (m_dao.insert(cfg)) {
+        refreshDbComboBox();
+        cmbDbConfigs->setCurrentText(name);
+    } else {
+        QMessageBox::warning(this, tr("Save Failed"), tr("Failed to save laser config to database."));
+    }
+}
+
+void OpticsControlWidget::onBtnDbDeleteClicked()
+{
+    QString name = cmbDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    int ret = QMessageBox::question(this, tr("Delete Laser Config"),
+                                    tr("Delete config \"%1\"?").arg(name),
+                                    QMessageBox::Yes | QMessageBox::No);
+    if (ret != QMessageBox::Yes)
+        return;
+
+    LaserConfig cfg = m_dao.queryByName(name);
+    if (cfg.id >= 0 && m_dao.remove(cfg.id)) {
+        refreshDbComboBox();
+    } else {
+        QMessageBox::warning(this, tr("Delete Failed"), tr("Failed to delete laser config."));
+    }
+}
+
+void OpticsControlWidget::onBtnDbOverwriteClicked()
+{
+    QString name = cmbDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    LaserConfig existing = m_dao.queryByName(name);
+    if (existing.id < 0) {
+        QMessageBox::warning(this, tr("Overwrite Failed"),
+                             tr("Config \"%1\" not found in database.").arg(name));
+        return;
+    }
+
+    int ret = QMessageBox::question(this, tr("Overwrite Laser Config"),
+                                    tr("Overwrite \"%1\" with current settings?").arg(name),
+                                    QMessageBox::Yes | QMessageBox::No);
+    if (ret != QMessageBox::Yes)
+        return;
+
+    existing.laser638nmEnable = btnLaser_1->isChecked();
+    existing.laser448nmEnable = btnLaser_2->isChecked();
+    existing.whiteLedEnable = btnLed->isChecked();
+    existing.laser638nmPower = spinLaserIntensity_1->value();
+    existing.laser448nmPower = spinLaserIntensity_2->value();
+    existing.whiteLedPower = spinLedIntensity->value();
+
+    if (!m_dao.update(existing)) {
+        QMessageBox::warning(this, tr("Overwrite Failed"), tr("Failed to update laser config in database."));
+    }
+}
+
+// ---- Helper methods ----
+
+void OpticsControlWidget::refreshDbComboBox()
+{
+    cmbDbConfigs->clear();
+    if (DatabaseManager::instance().isConnected()) {
+        cmbDbConfigs->addItems(m_dao.queryAllNames());
+    }
+}
+
+void OpticsControlWidget::applyLaserConfig(const LaserConfig &cfg)
+{
+    // Block signals to avoid triggering Modbus commands during batch update
+    btnLaser_1->blockSignals(true);
+    btnLaser_2->blockSignals(true);
+    btnLed->blockSignals(true);
+    spinLaserIntensity_1->blockSignals(true);
+    spinLaserIntensity_2->blockSignals(true);
+    spinLedIntensity->blockSignals(true);
+
+    // Set UI values
+    spinLaserIntensity_1->setValue(cfg.laser638nmPower);
+    spinLaserIntensity_2->setValue(cfg.laser448nmPower);
+    spinLedIntensity->setValue(cfg.whiteLedPower);
+    btnLaser_1->setChecked(cfg.laser638nmEnable);
+    btnLaser_2->setChecked(cfg.laser448nmEnable);
+    btnLed->setChecked(cfg.whiteLedEnable);
+
+    // Restore signals
+    btnLaser_1->blockSignals(false);
+    btnLaser_2->blockSignals(false);
+    btnLed->blockSignals(false);
+    spinLaserIntensity_1->blockSignals(false);
+    spinLaserIntensity_2->blockSignals(false);
+    spinLedIntensity->blockSignals(false);
+
+    // Send commands to device
+    onLaser1Toggled(cfg.laser638nmEnable);
+    onLaser2Toggled(cfg.laser448nmEnable);
+    onLedToggled(cfg.whiteLedEnable);
+}
+
+// ---- UI initialization ----
 
 void OpticsControlWidget::initDockWidget()
 {
-    // QGroupBox *groupLaser = new QGroupBox("Laser Control", this);
-    // QGroupBox *groupLed = new QGroupBox("LED Control", this);
-
     btnLaser_1 = new ToggleSwitch(this);
     btnLaser_2 = new ToggleSwitch(this);
     btnLed = new ToggleSwitch(this);
 
-    spinLaserIntensity_1 = new QSpinBox(this); 
+    spinLaserIntensity_1 = new QSpinBox(this);
     spinLaserIntensity_2 = new QSpinBox(this);
     spinLedIntensity = new QSpinBox(this);
 
@@ -177,15 +327,13 @@ void OpticsControlWidget::initDockWidget()
     statusLightLed = new StatusLight(this);
 
 
-    QWidget *mainWidget = new QWidget(this);
     QGridLayout *laserLayout = new QGridLayout();
-
 
     auto addLabel = [&](QGridLayout* lay, int row, int col, const QString &text){
         QLabel *hdr = new QLabel(text, this);
         hdr->setAlignment(Qt::AlignCenter);
         hdr->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-        hdr->setFixedHeight(20); // 你可以调整到合适值，例如 18~24
+        hdr->setFixedHeight(20);
         lay->addWidget(hdr, row, col);
     };
 
@@ -212,6 +360,36 @@ void OpticsControlWidget::initDockWidget()
     laserLayout->addWidget(spinLedIntensity, 3, 2);
     laserLayout->addWidget(statusLightLed, 3, 3);
 
-    mainWidget->setLayout(laserLayout);
+    // ---- DB parameter management group ----
+    cmbDbConfigs = new QComboBox(this);
+    cmbDbConfigs->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    btnDbLoad = new QPushButton(tr("Load"), this);
+    btnDbSave = new QPushButton(tr("Save As"), this);
+    btnDbOverwrite = new QPushButton(tr("Overwrite"), this);
+    btnDbDelete = new QPushButton(tr("Delete"), this);
+
+    QHBoxLayout *dbBtnLayout = new QHBoxLayout;
+    dbBtnLayout->addWidget(btnDbLoad);
+    dbBtnLayout->addWidget(btnDbSave);
+    dbBtnLayout->addWidget(btnDbOverwrite);
+    dbBtnLayout->addWidget(btnDbDelete);
+
+    QVBoxLayout *dbLayout = new QVBoxLayout;
+    dbLayout->addWidget(cmbDbConfigs);
+    dbLayout->addLayout(dbBtnLayout);
+
+    QGroupBox *grpDb = new QGroupBox(tr("Laser Config Management"), this);
+    grpDb->setLayout(dbLayout);
+
+    // ---- Assemble ----
+    QWidget *mainWidget = new QWidget(this);
+    QVBoxLayout *mainLayout = new QVBoxLayout(mainWidget);
+    mainLayout->addLayout(laserLayout);
+    mainLayout->addWidget(grpDb);
+
+    mainWidget->setLayout(mainLayout);
     setWidget(mainWidget);
+
+    // Load saved configs from database
+    refreshDbComboBox();
 }

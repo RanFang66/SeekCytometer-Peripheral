@@ -11,7 +11,11 @@
 #include <QTimer>
 #include "ArrowButton.h"
 #include <QCheckBox>
+#include <QComboBox>
 #include "ToggleSwitch.h"
+
+#include "database/ChipPositionDao.h"
+#include "database/LensPositionDao.h"
 
 class SampleChipWidget : public QDockWidget
 {
@@ -28,8 +32,6 @@ private slots:
     void onChurnCWClicked();
     void onChurnCCWClicked();
     void onChurnStopClicked();
-    // void onTempControlClicked();
-
 
     void onMoveLeftClicked();
     void onMoveRightClicked();
@@ -46,10 +48,22 @@ private slots:
     void onYRunToPosClicked();
     void onZRunToPosClicked();
 
+    // Chip position DB slots
+    void onBtnChipDbLoadClicked();
+    void onBtnChipDbSaveClicked();
+    void onBtnChipDbDeleteClicked();
+    void onBtnChipDbOverwriteClicked();
+
+    // Lens position DB slots
+    void onBtnLensDbLoadClicked();
+    void onBtnLensDbSaveClicked();
+    void onBtnLensDbDeleteClicked();
+    void onBtnLensDbOverwriteClicked();
 
 private:
     void initSampleChipWidget();
-
+    void refreshChipDbComboBox();
+    void refreshLensDbComboBox();
 
     ArrowButton *btnMoveXForward;
     ArrowButton *btnMoveXBackward;
@@ -82,8 +96,6 @@ private:
     QPushButton *btnChurnRunCCW;
     QPushButton *btnChurnStop;
 
-    // QPushButton *btnTempControl;
-
     QLabel *lblCoverStatus;
     QLabel *lblPressStatus;
     QLabel *lblChurnStatus;
@@ -93,14 +105,24 @@ private:
     QLabel *lblMotorXStatus;
     QLabel *lblMotorYStatus;
     QLabel *lblMotorZStatus;
-    // ToggleSwitch *chkFans[FAN_NUM];
-    // QSpinBox *spinFanSpeed[FAN_NUM];
-    // QPushButton *btnFanEnable;
 
     QSpinBox *spinChurnSpeed;
-    // QDoubleSpinBox *spinTargetTemp;
 
+    // Chip position DB management
+    QComboBox   *cmbChipDbConfigs;
+    QPushButton *btnChipDbLoad;
+    QPushButton *btnChipDbSave;
+    QPushButton *btnChipDbDelete;
+    QPushButton *btnChipDbOverwrite;
+    ChipPositionDao m_chipDao;
 
+    // Lens position DB management
+    QComboBox   *cmbLensDbConfigs;
+    QPushButton *btnLensDbLoad;
+    QPushButton *btnLensDbSave;
+    QPushButton *btnLensDbDelete;
+    QPushButton *btnLensDbOverwrite;
+    LensPositionDao m_lensDao;
 
     uint16_t coverStatus;
     uint16_t sealStatus;

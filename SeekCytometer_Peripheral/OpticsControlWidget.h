@@ -7,8 +7,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
+#include <QComboBox>
 #include "ToggleSwitch.h"
 #include "StatusLight.h"
+
+#include "database/LaserConfigDao.h"
 
 class OpticsControlWidget : public QDockWidget
 {
@@ -26,8 +29,16 @@ private slots:
     void onLaser2IntensityChanged();
     void onLedIntensityChanged();
 
+    // DB slots
+    void onBtnDbLoadClicked();
+    void onBtnDbSaveClicked();
+    void onBtnDbDeleteClicked();
+    void onBtnDbOverwriteClicked();
+
 private:
     void initDockWidget();
+    void refreshDbComboBox();
+    void applyLaserConfig(const LaserConfig &cfg);
 
     ToggleSwitch *btnLaser_1;
     ToggleSwitch *btnLaser_2;
@@ -37,14 +48,17 @@ private:
     QSpinBox *spinLaserIntensity_2;
     QSpinBox *spinLedIntensity;
 
-    // QLabel  *lblLaser1Status;
-    // QLabel  *lblLaser2Status;
-    // QLabel  *lblLedStatus;
-
     StatusLight *statusLightLaser1;
     StatusLight *statusLightLaser2;
     StatusLight *statusLightLed;
 
+    // DB management
+    QComboBox   *cmbDbConfigs;
+    QPushButton *btnDbLoad;
+    QPushButton *btnDbSave;
+    QPushButton *btnDbDelete;
+    QPushButton *btnDbOverwrite;
+    LaserConfigDao m_dao;
 
     int     statusLaser1;
     int     statusLaser2;

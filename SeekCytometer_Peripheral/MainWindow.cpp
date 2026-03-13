@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include "ModbusMaster.h"
 #include "ModbusRegistersTable.h"
+#include "database/DatabaseManager.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_count(0)
@@ -10,6 +11,17 @@ MainWindow::MainWindow(QWidget *parent)
 
     setWindowIcon(QIcon(":/fr_icon.ico"));
     setWindowState(Qt::WindowState::WindowMaximized);
+
+    // Connect to PostgreSQL database and initialize tables
+    DatabaseManager &db = DatabaseManager::instance();
+    if (db.connect("localhost", 5432, "seekcytometer_peripheral", "postgres", "kissfire")) {
+        db.initTables();
+    } else {
+        QMessageBox::warning(this, tr("Database Error"),
+                             tr("Failed to connect to database.\n"
+                                "Parameter management will be unavailable."));
+    }
+
     initDockWidgets();
     statusUpdateTimer = new QTimer(this);
 
@@ -34,6 +46,7 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     statusUpdateTimer->stop();
+    DatabaseManager::instance().disconnect();
 }
 
 

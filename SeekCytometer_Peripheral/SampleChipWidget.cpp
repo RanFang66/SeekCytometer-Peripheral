@@ -4,8 +4,11 @@
 #include <QHBoxLayout>
 #include <QGridLayout>
 #include <QSpacerItem>
+#include <QInputDialog>
+#include <QMessageBox>
 #include "ModbusMaster.h"
 #include "ModbusRegistersTable.h"
+#include "database/DatabaseManager.h"
 #include <QThread>
 
 
@@ -32,15 +35,12 @@ SampleChipWidget::SampleChipWidget(const QString &tilte, QWidget *parent)
 {
     initSampleChipWidget();
 
-
-
     connect(btnOpenCover, &QPushButton::clicked, this, &SampleChipWidget::onOpenCoverClicked);
     connect(btnCloseCover, &QPushButton::clicked, this, &SampleChipWidget::onCloseCoverClicked);
     connect(btnPressSample, &QPushButton::clicked, this, &SampleChipWidget::onPressSampleClicked);
     connect(btnReleaseSample, &QPushButton::clicked, this, &SampleChipWidget::onReleaseSampleClicked);
     connect(btnChurnRunCW, &QPushButton::clicked, this, &SampleChipWidget::onChurnCWClicked);
     connect(btnChurnRunCCW, &QPushButton::clicked, this, &SampleChipWidget::onChurnCCWClicked);
-    // connect(btnTempControl, &QPushButton::clicked, this, &SampleChipWidget::onTempControlClicked);
     connect(btnChurnStop, &QPushButton::clicked, this, &SampleChipWidget::onChurnStopClicked);
     connect(btnMoveXBackward, &ArrowButton::clicked, this, &SampleChipWidget::onMoveLeftClicked);
     connect(btnMoveXForward, &ArrowButton::clicked, this, &SampleChipWidget::onMoveRightClicked);
@@ -54,6 +54,18 @@ SampleChipWidget::SampleChipWidget(const QString &tilte, QWidget *parent)
     connect(btnXGoPos, &QPushButton::clicked, this, &SampleChipWidget::onXRunToPosClicked);
     connect(btnYGoPos, &QPushButton::clicked, this, &SampleChipWidget::onYRunToPosClicked);
     connect(btnZGoPos, &QPushButton::clicked, this, &SampleChipWidget::onZRunToPosClicked);
+
+    // Chip position DB
+    connect(btnChipDbLoad, &QPushButton::clicked, this, &SampleChipWidget::onBtnChipDbLoadClicked);
+    connect(btnChipDbSave, &QPushButton::clicked, this, &SampleChipWidget::onBtnChipDbSaveClicked);
+    connect(btnChipDbDelete, &QPushButton::clicked, this, &SampleChipWidget::onBtnChipDbDeleteClicked);
+    connect(btnChipDbOverwrite, &QPushButton::clicked, this, &SampleChipWidget::onBtnChipDbOverwriteClicked);
+
+    // Lens position DB
+    connect(btnLensDbLoad, &QPushButton::clicked, this, &SampleChipWidget::onBtnLensDbLoadClicked);
+    connect(btnLensDbSave, &QPushButton::clicked, this, &SampleChipWidget::onBtnLensDbSaveClicked);
+    connect(btnLensDbDelete, &QPushButton::clicked, this, &SampleChipWidget::onBtnLensDbDeleteClicked);
+    connect(btnLensDbOverwrite, &QPushButton::clicked, this, &SampleChipWidget::onBtnLensDbOverwriteClicked);
 }
 
 void SampleChipWidget::updateStatus(const QVector<uint16_t> &regs)
@@ -65,7 +77,6 @@ void SampleChipWidget::updateStatus(const QVector<uint16_t> &regs)
     coverStatus = regs[0];
     sealStatus = regs[1];
     churnStatus= regs[2];
-    // tempCtrlStatus = regs[3];
     motorXStatus = regs[3];
     motorYStatus = regs[4];
     motorZStatus = regs[5];
@@ -80,7 +91,6 @@ void SampleChipWidget::updateStatus(const QVector<uint16_t> &regs)
     lblCoverStatus->setText(coverStatusStr[coverStatus]);
     lblPressStatus->setText(sealStatusStr[sealStatus]);
     lblChurnStatus->setText(churnStatusStr[churnStatus]);
-    // lblTempContorlStatus->setText(tempStatusStr[tempCtrlStatus]);
     lblMotorXStatus->setText(QString::asprintf("X Status: 0x%4x", motorXStatus));
     lblMotorYStatus->setText(QString::asprintf("Y Status: 0x%4x", motorYStatus));
     lblMotorZStatus->setText(QString::asprintf("Len Status: 0x%4x", motorZStatus));
@@ -145,26 +155,6 @@ void SampleChipWidget::onChurnStopClicked()
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, 0x0000);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, CW_CHURN_BIT);
 }
-
-// void SampleChipWidget::onTempControlClicked()
-// {
-//     double val = spinTargetTemp->value();
-//     uint16_t tempTarget = val * 10;
-
-
-//     if (btnTempControl->text() == QString(tr("Temp Control Start"))) {
-//         const QVector<uint16_t> tempCmd = {TEMP_CMD_START, tempTarget};
-//         ModbusMaster::instance().asyncWriteMultipleRegisters(SLAVE_ADDR, MOTOR_CTRL_TEMP_CMD, tempCmd);
-//         ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, 0x0000);
-//         ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, CW_TEMP_BIT);
-//         btnTempControl->setText(QString(tr("Temp Control Stop")));
-//     } else {
-//         ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_TEMP_CMD, TEMP_CMD_STOP);
-//         ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, 0x0000);
-//         ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, CW_TEMP_BIT);
-//         btnTempControl->setText(QString(tr("Temp Control Start")));
-//     }
-// }
 
 void SampleChipWidget::onMoveLeftClicked()
 {
@@ -334,8 +324,220 @@ void SampleChipWidget::onZRunToPosClicked()
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, CW_STEPPER_MOTOR_BIT);
 }
 
+// ---- Chip Position DB slots ----
 
+void SampleChipWidget::onBtnChipDbLoadClicked()
+{
+    QString name = cmbChipDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
 
+    ChipPosition pos = m_chipDao.queryByName(name);
+    if (pos.id < 0) {
+        QMessageBox::warning(this, tr("Load Failed"),
+                             tr("Chip position \"%1\" not found in database.").arg(name));
+        return;
+    }
+
+    // Set spinboxes and move to position
+    spinXPos->setValue(pos.xPosition);
+    spinYPos->setValue(pos.yPosition);
+    onXRunToPosClicked();
+    onYRunToPosClicked();
+}
+
+void SampleChipWidget::onBtnChipDbSaveClicked()
+{
+    bool ok = false;
+    QString name = QInputDialog::getText(this, tr("Save Chip Position"),
+                                         tr("Enter position name:"),
+                                         QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+    name = name.trimmed();
+
+    ChipPosition existing = m_chipDao.queryByName(name);
+    if (existing.id >= 0) {
+        QMessageBox::warning(this, tr("Save Failed"),
+                             tr("Name \"%1\" already exists. Use \"Overwrite\" to update.").arg(name));
+        return;
+    }
+
+    ChipPosition pos;
+    pos.name = name;
+    pos.xPosition = motorXPos;
+    pos.yPosition = motorYPos;
+
+    if (m_chipDao.insert(pos)) {
+        refreshChipDbComboBox();
+        cmbChipDbConfigs->setCurrentText(name);
+    } else {
+        QMessageBox::warning(this, tr("Save Failed"), tr("Failed to save chip position to database."));
+    }
+}
+
+void SampleChipWidget::onBtnChipDbDeleteClicked()
+{
+    QString name = cmbChipDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    int ret = QMessageBox::question(this, tr("Delete Chip Position"),
+                                    tr("Delete position \"%1\"?").arg(name),
+                                    QMessageBox::Yes | QMessageBox::No);
+    if (ret != QMessageBox::Yes)
+        return;
+
+    ChipPosition pos = m_chipDao.queryByName(name);
+    if (pos.id >= 0 && m_chipDao.remove(pos.id)) {
+        refreshChipDbComboBox();
+    } else {
+        QMessageBox::warning(this, tr("Delete Failed"), tr("Failed to delete chip position."));
+    }
+}
+
+void SampleChipWidget::onBtnChipDbOverwriteClicked()
+{
+    QString name = cmbChipDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    ChipPosition existing = m_chipDao.queryByName(name);
+    if (existing.id < 0) {
+        QMessageBox::warning(this, tr("Overwrite Failed"),
+                             tr("Position \"%1\" not found in database.").arg(name));
+        return;
+    }
+
+    int ret = QMessageBox::question(this, tr("Overwrite Chip Position"),
+                                    tr("Overwrite \"%1\" with current position (X:%2, Y:%3)?")
+                                        .arg(name).arg(motorXPos).arg(motorYPos),
+                                    QMessageBox::Yes | QMessageBox::No);
+    if (ret != QMessageBox::Yes)
+        return;
+
+    existing.xPosition = motorXPos;
+    existing.yPosition = motorYPos;
+
+    if (!m_chipDao.update(existing)) {
+        QMessageBox::warning(this, tr("Overwrite Failed"), tr("Failed to update chip position in database."));
+    }
+}
+
+// ---- Lens Position DB slots ----
+
+void SampleChipWidget::onBtnLensDbLoadClicked()
+{
+    QString name = cmbLensDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    LensPosition pos = m_lensDao.queryByName(name);
+    if (pos.id < 0) {
+        QMessageBox::warning(this, tr("Load Failed"),
+                             tr("Lens position \"%1\" not found in database.").arg(name));
+        return;
+    }
+
+    spinZPos->setValue(pos.zPosition);
+    onZRunToPosClicked();
+}
+
+void SampleChipWidget::onBtnLensDbSaveClicked()
+{
+    bool ok = false;
+    QString name = QInputDialog::getText(this, tr("Save Lens Position"),
+                                         tr("Enter position name:"),
+                                         QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+    name = name.trimmed();
+
+    LensPosition existing = m_lensDao.queryByName(name);
+    if (existing.id >= 0) {
+        QMessageBox::warning(this, tr("Save Failed"),
+                             tr("Name \"%1\" already exists. Use \"Overwrite\" to update.").arg(name));
+        return;
+    }
+
+    LensPosition pos;
+    pos.name = name;
+    pos.zPosition = motorZPos;
+
+    if (m_lensDao.insert(pos)) {
+        refreshLensDbComboBox();
+        cmbLensDbConfigs->setCurrentText(name);
+    } else {
+        QMessageBox::warning(this, tr("Save Failed"), tr("Failed to save lens position to database."));
+    }
+}
+
+void SampleChipWidget::onBtnLensDbDeleteClicked()
+{
+    QString name = cmbLensDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    int ret = QMessageBox::question(this, tr("Delete Lens Position"),
+                                    tr("Delete position \"%1\"?").arg(name),
+                                    QMessageBox::Yes | QMessageBox::No);
+    if (ret != QMessageBox::Yes)
+        return;
+
+    LensPosition pos = m_lensDao.queryByName(name);
+    if (pos.id >= 0 && m_lensDao.remove(pos.id)) {
+        refreshLensDbComboBox();
+    } else {
+        QMessageBox::warning(this, tr("Delete Failed"), tr("Failed to delete lens position."));
+    }
+}
+
+void SampleChipWidget::onBtnLensDbOverwriteClicked()
+{
+    QString name = cmbLensDbConfigs->currentText();
+    if (name.isEmpty())
+        return;
+
+    LensPosition existing = m_lensDao.queryByName(name);
+    if (existing.id < 0) {
+        QMessageBox::warning(this, tr("Overwrite Failed"),
+                             tr("Position \"%1\" not found in database.").arg(name));
+        return;
+    }
+
+    int ret = QMessageBox::question(this, tr("Overwrite Lens Position"),
+                                    tr("Overwrite \"%1\" with current Z position (%2)?")
+                                        .arg(name).arg(motorZPos),
+                                    QMessageBox::Yes | QMessageBox::No);
+    if (ret != QMessageBox::Yes)
+        return;
+
+    existing.zPosition = motorZPos;
+
+    if (!m_lensDao.update(existing)) {
+        QMessageBox::warning(this, tr("Overwrite Failed"), tr("Failed to update lens position in database."));
+    }
+}
+
+// ---- Helper methods ----
+
+void SampleChipWidget::refreshChipDbComboBox()
+{
+    cmbChipDbConfigs->clear();
+    if (DatabaseManager::instance().isConnected()) {
+        cmbChipDbConfigs->addItems(m_chipDao.queryAllNames());
+    }
+}
+
+void SampleChipWidget::refreshLensDbComboBox()
+{
+    cmbLensDbConfigs->clear();
+    if (DatabaseManager::instance().isConnected()) {
+        cmbLensDbConfigs->addItems(m_lensDao.queryAllNames());
+    }
+}
+
+// ---- UI initialization ----
 
 void SampleChipWidget::initSampleChipWidget()
 {
@@ -344,8 +546,6 @@ void SampleChipWidget::initSampleChipWidget()
     QGroupBox *groupCover = new QGroupBox("Cover Control", this);
     QGroupBox *groupSeal = new QGroupBox("Seal Control", this);
     QGroupBox *groupChurn = new QGroupBox("Churn Control", this);
-    // QGroupBox *groupTempControl = new QGroupBox("Temperature Control", this);
-    // QGroupBox *groupFanControl = new QGroupBox("Fan Control", this);
 
     auto addSpin = [&](QGridLayout *lay, int row, int col, const QString &prompt, QAbstractSpinBox *spinbox) {
         QLabel *lblPrompt = new QLabel(prompt, this);
@@ -402,10 +602,6 @@ void SampleChipWidget::initSampleChipWidget()
     spinZPos->setRange(-10000, 35000);
     spinZPos->setSingleStep(1000);
     spinZPos->setValue(-7600);
-    // btnMoveXBackward->setFixedSize(64, 64);
-    // btnMoveXForward->setFixedSize(64, 64);
-    // btnMoveYBackward->setFixedSize(64, 64);
-    // btnMoveYForward->setFixedSize(64, 64);
 
     btnMoveLenUp = new ArrowButton(ArrowButton::Direction::Up, this);
     btnMoveLenDown = new ArrowButton(ArrowButton::Direction::Down, this);
@@ -419,34 +615,20 @@ void SampleChipWidget::initSampleChipWidget()
     btnChurnRunCW = new QPushButton("Churn CW", this);
     btnChurnRunCCW = new QPushButton("Churn CCW", this);
     btnChurnStop = new QPushButton("Churn Stop", this);
-    // btnTempControl = new QPushButton("Temp Control Start", this);
 
     lblCoverStatus = new QLabel("Cover: Opened", this);
     lblPressStatus = new QLabel("Presser: Released", this);
     lblChurnStatus = new QLabel("Churn: IDLE", this);
-    // lblTempContorlStatus = new QLabel("Current: 25 ℃", this);
     lblChipPos = new QLabel("X Pos: 100, \nY Pos: 10000", this);
     lblMotorXStatus = new QLabel("X Status: 0");
     lblMotorYStatus = new QLabel("Y Status: 0");
     lblMotorZStatus = new QLabel("Len Status: 0");
     lblLenPos = new QLabel("Len(Z) Pos: 10000", this);
 
-
-
-
     spinChurnSpeed = new QSpinBox(this);
     spinChurnSpeed->setMinimum(10);
     spinChurnSpeed->setMaximum(2000);
     spinChurnSpeed->setValue(120);
-
-    // spinTargetTemp = new QDoubleSpinBox(this);
-    // spinTargetTemp->setMinimum(0.0);
-    // spinTargetTemp->setDecimals(1);
-    // spinTargetTemp->setMaximum(30.0);
-    // spinTargetTemp->setSingleStep(0.1);
-    // spinTargetTemp->setValue(4.0);
-
-
 
     QHBoxLayout *coverLayout = new QHBoxLayout();
     coverLayout->addWidget(btnOpenCover);
@@ -466,29 +648,6 @@ void SampleChipWidget::initSampleChipWidget()
     churnLayout->addWidget(spinChurnSpeed);
     churnLayout->addWidget(lblChurnStatus);
 
-
-    // QGridLayout *tempControlLayout = new QGridLayout();
-    // tempControlLayout->addWidget(new QLabel(tr("Target Temp(℃):"), this), 0, 0);
-    // tempControlLayout->addWidget(spinTargetTemp, 0, 1);
-    // tempControlLayout->addWidget(btnTempControl, 0, 2);
-    // tempControlLayout->addWidget(new QLabel(tr("Current Temp(℃):"), this), 1, 0);
-    // tempControlLayout->addWidget(lblTempContorlStatus, 1, 1, 1, 2);
-    // QGridLayout *fanLayout = new QGridLayout();
-    // for (int i = 0; i < FAN_NUM; i++) {
-    //     chkFans[i] = new ToggleSwitch(this);
-    //     spinFanSpeed[i] = new QSpinBox(this);
-    //     spinFanSpeed[i]->setRange(0, 100);
-    //     spinFanSpeed[i]->setValue(0);
-    //     fanLayout->addWidget(new QLabel(QString("Fan-%1").arg(i+1), this), i, 0, Qt::AlignCenter);
-    //     fanLayout->addWidget(chkFans[i], i, 1);
-    //     fanLayout->addWidget(spinFanSpeed[i], i, 2);
-    // }
-    // btnFanEnable = new QPushButton("Switch On", this);
-    // btnFanEnable->setCheckable(true);
-    // fanLayout->addWidget(btnFanEnable, 4, 0, 1, 2);
-
-
-
     QGridLayout *chipMoveLayout = new QGridLayout();
     chipMoveLayout->addWidget(lblMotorXStatus, 0, 0, Qt::AlignCenter);
     chipMoveLayout->addWidget(lblMotorYStatus, 0, 2, Qt::AlignCenter);
@@ -503,6 +662,29 @@ void SampleChipWidget::initSampleChipWidget()
     chipMoveLayout->addWidget(btnMoveYBackward, 5, 1);
     addSpinButton(chipMoveLayout, 6, 0, btnXGoPos, spinXPos);
     addSpinButton(chipMoveLayout, 6, 2, btnYGoPos, spinYPos);
+
+    // ---- Chip Position DB management (embedded in Chip Move group) ----
+    cmbChipDbConfigs = new QComboBox(this);
+    cmbChipDbConfigs->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    btnChipDbLoad = new QPushButton(tr("Load"), this);
+    btnChipDbSave = new QPushButton(tr("Save As"), this);
+    btnChipDbOverwrite = new QPushButton(tr("Overwrite"), this);
+    btnChipDbDelete = new QPushButton(tr("Delete"), this);
+
+    QHBoxLayout *chipDbBtnLayout = new QHBoxLayout;
+    chipDbBtnLayout->addWidget(btnChipDbLoad);
+    chipDbBtnLayout->addWidget(btnChipDbSave);
+    chipDbBtnLayout->addWidget(btnChipDbOverwrite);
+    chipDbBtnLayout->addWidget(btnChipDbDelete);
+
+    QVBoxLayout *chipDbLayout = new QVBoxLayout;
+    chipDbLayout->addWidget(cmbChipDbConfigs);
+    chipDbLayout->addLayout(chipDbBtnLayout);
+
+    QGroupBox *grpChipDb = new QGroupBox(tr("Chip Position Management"), this);
+    grpChipDb->setLayout(chipDbLayout);
+
+    chipMoveLayout->addWidget(grpChipDb, 7, 0, 1, 3);
 
 
     QVBoxLayout *lenMoveLayout = new QVBoxLayout();
@@ -520,14 +702,36 @@ void SampleChipWidget::initSampleChipWidget()
     layout2->addWidget(spinZPos);
     lenMoveLayout->addLayout(layout2);
 
+    // ---- Lens Position DB management (embedded in Len Move group) ----
+    cmbLensDbConfigs = new QComboBox(this);
+    cmbLensDbConfigs->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    btnLensDbLoad = new QPushButton(tr("Load"), this);
+    btnLensDbSave = new QPushButton(tr("Save As"), this);
+    btnLensDbOverwrite = new QPushButton(tr("Overwrite"), this);
+    btnLensDbDelete = new QPushButton(tr("Delete"), this);
+
+    QVBoxLayout *lensDbLayout = new QVBoxLayout;
+    lensDbLayout->addWidget(cmbLensDbConfigs);
+    QHBoxLayout *lensDbBtnRow1 = new QHBoxLayout;
+    lensDbBtnRow1->addWidget(btnLensDbLoad);
+    lensDbBtnRow1->addWidget(btnLensDbSave);
+    lensDbLayout->addLayout(lensDbBtnRow1);
+    QHBoxLayout *lensDbBtnRow2 = new QHBoxLayout;
+    lensDbBtnRow2->addWidget(btnLensDbOverwrite);
+    lensDbBtnRow2->addWidget(btnLensDbDelete);
+    lensDbLayout->addLayout(lensDbBtnRow2);
+
+    QGroupBox *grpLensDb = new QGroupBox(tr("Lens Position Management"), this);
+    grpLensDb->setLayout(lensDbLayout);
+
+    lenMoveLayout->addWidget(grpLensDb);
+
 
     groupChipMove->setLayout(chipMoveLayout);
     groupLenMove->setLayout(lenMoveLayout);
     groupChurn->setLayout(churnLayout);
     groupCover->setLayout(coverLayout);
     groupSeal->setLayout(sealLayout);
-    // groupTempControl->setLayout(tempControlLayout);
-    // groupFanControl->setLayout(fanLayout);
 
     QWidget *mainWidget = new QWidget(this);
     QVBoxLayout *mainLayout = new QVBoxLayout(mainWidget);
@@ -537,11 +741,11 @@ void SampleChipWidget::initSampleChipWidget()
     mainLayout->addWidget(groupCover, 1);
     mainLayout->addWidget(groupSeal, 1);
     mainLayout->addWidget(groupChurn, 1);
-    // mainLayout->addWidget(groupTempControl, 2);
-    // mainLayout->addWidget(groupFanControl, 3);
     mainLayout->addLayout(moveLayout, 6);
 
     setWidget(mainWidget);
+
+    // Load saved configs from database
+    refreshChipDbComboBox();
+    refreshLensDbComboBox();
 }
-
-
