@@ -99,7 +99,7 @@ void Laser_SetIntensity(LaserIndex_t id, uint16_t val)
 uint8_t Laser_GetStatus(LaserIndex_t id)
 {
 	if (id != LASER_1 && id != LASER_2) {
-		return;
+		return 0;
 	}
 	return laserCtrl[id].status;
 }
@@ -107,7 +107,7 @@ uint8_t Laser_GetStatus(LaserIndex_t id)
 uint16_t Laser_GetIntensity(LaserIndex_t id)
 {
 	if (id != LASER_1 && id != LASER_2) {
-		return;
+		return 0;
 	}
 	return laserCtrl[id].intensity;
 }
