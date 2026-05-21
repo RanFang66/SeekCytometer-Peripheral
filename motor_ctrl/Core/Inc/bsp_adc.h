@@ -12,7 +12,7 @@
 
 #define BSP_ADC_HANDLE				hadc1
 #define DATA_BUFFER_SIZE 			(4)
-#define ADC_ENABLED_CHANNEL_NUM		(6)
+#define ADC_ENABLED_CHANNEL_NUM		(9)
 
 #define SEAL_MOTOR_CURRENT_CHANNEL	ADC_CHANNEL_4
 #define LASER2_CURRENT_CHANNEL		ADC_CHANNEL_5
@@ -20,13 +20,22 @@
 #define LASER1_POWER_CHANNEL		ADC_CHANNEL_8
 #define NTC_TEMP_CHANNEL			ADC_CHANNEL_9
 #define LASER1_CURRENT_CHANNEL		ADC_CHANNEL_14
+#define NTC_TEMP_2_CHANNEL			ADC_CHANNEL_3
+#define NTC_TEMP_3_CHANNEL			ADC_CHANNEL_2
+#define NTC_TEMP_4_CHANNEL			ADC_CHANNEL_13
+
 
 
 void BSP_StartAdcConvertContinuous();
 void BSP_StopAdcConvert(void);
 
 uint16_t GetMotorCurrentAdc();
-uint16_t GetTempAdc();
+uint16_t GetTempAdc_NTC1();
+uint16_t GetTempAdc_NTC2();
+uint16_t GetTempAdc_NTC3();
+uint16_t GetTempAdc_NTC4();
+
+
 uint16_t GetLaser1CurrentAdc();
 uint16_t GetLaser1PowerAdc();
 uint16_t GetLaser2CurrentAdc();

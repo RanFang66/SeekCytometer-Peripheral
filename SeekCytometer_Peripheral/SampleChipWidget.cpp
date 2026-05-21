@@ -39,6 +39,7 @@ SampleChipWidget::SampleChipWidget(const QString &tilte, QWidget *parent)
     connect(btnCloseCover, &QPushButton::clicked, this, &SampleChipWidget::onCloseCoverClicked);
     connect(btnPressSample, &QPushButton::clicked, this, &SampleChipWidget::onPressSampleClicked);
     connect(btnReleaseSample, &QPushButton::clicked, this, &SampleChipWidget::onReleaseSampleClicked);
+    connect(btnResetSampleChip, &QPushButton::clicked, this, &SampleChipWidget::onResetSampleClicked);
     connect(btnChurnRunCW, &QPushButton::clicked, this, &SampleChipWidget::onChurnCWClicked);
     connect(btnChurnRunCCW, &QPushButton::clicked, this, &SampleChipWidget::onChurnCCWClicked);
     connect(btnChurnStop, &QPushButton::clicked, this, &SampleChipWidget::onChurnStopClicked);
@@ -123,6 +124,13 @@ void SampleChipWidget::onPressSampleClicked()
 void SampleChipWidget::onReleaseSampleClicked()
 {
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_SEAL_CMD, SEAL_CMD_RELEASE);
+    ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, 0x0000);
+    ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, CW_SEAL_BIT);
+}
+
+void SampleChipWidget::onResetSampleClicked()
+{
+    ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_SEAL_CMD, SEAL_CMD_RESET);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, 0x0000);
     ModbusMaster::instance().asyncWriteSingleRegister(SLAVE_ADDR, MOTOR_CTRL_CW, CW_SEAL_BIT);
 }
@@ -611,6 +619,7 @@ void SampleChipWidget::initSampleChipWidget()
 
     btnPressSample = new QPushButton("Press Sample", this);
     btnReleaseSample = new QPushButton("Release Sample", this);
+    btnResetSampleChip = new QPushButton("Reset Sample", this);
 
     btnChurnRunCW = new QPushButton("Churn CW", this);
     btnChurnRunCCW = new QPushButton("Churn CCW", this);
@@ -638,6 +647,7 @@ void SampleChipWidget::initSampleChipWidget()
     QHBoxLayout *sealLayout = new QHBoxLayout();
     sealLayout->addWidget(btnPressSample);
     sealLayout->addWidget(btnReleaseSample);
+    sealLayout->addWidget(btnResetSampleChip);
     sealLayout->addWidget(lblPressStatus);
 
 

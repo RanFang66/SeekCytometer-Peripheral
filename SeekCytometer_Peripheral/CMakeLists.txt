@@ -39,7 +39,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         PZTCtrlWidget.h PZTCtrlWidget.cpp
         MFCParasSetWidget.h MFCParasSetWidget.cpp
         resource.qrc
-        #app_icon.rc
+        app_icon.rc
         TempControlWidget.h TempControlWidget.cpp
         database/DatabaseManager.h database/DatabaseManager.cpp
         database/DatabaseModels.h

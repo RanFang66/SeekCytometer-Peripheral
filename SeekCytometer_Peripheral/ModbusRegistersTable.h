@@ -173,6 +173,7 @@
 #define COVER_CMD_CLOSE     0x0002
 #define SEAL_CMD_PUSH       0x0001
 #define SEAL_CMD_RELEASE    0x0002
+#define SEAL_CMD_RESET      0x0003
 #define CHURN_CMD_STOP      0x0000
 #define CHURN_CMD_RUN_CW    0x0001
 #define CHURN_CMD_RUN_CCW   0x0002

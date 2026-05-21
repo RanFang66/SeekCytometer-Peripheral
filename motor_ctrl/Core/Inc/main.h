@@ -75,6 +75,8 @@ void Error_Handler(void);
 #define EN_15_GPIO_Port GPIOB
 #define EN_12V_Pin GPIO_PIN_13
 #define EN_12V_GPIO_Port GPIOB
+#define churn_dc_motor_Pin GPIO_PIN_11
+#define churn_dc_motor_GPIO_Port GPIOD
 #define M1_Power_Pin GPIO_PIN_7
 #define M1_Power_GPIO_Port GPIOC
 #define L5_Pin GPIO_PIN_8

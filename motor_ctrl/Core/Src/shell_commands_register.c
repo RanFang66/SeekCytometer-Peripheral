@@ -294,13 +294,18 @@ static void TempControlCommand(int argc, char *argv[])
 			break;
 
 		case 'i':
-			Shell_Print("TempCtrl Status: %s, Target: %d, Measured: %d",
-					tempStatusStr[TempCtrl_GetStatus()], (int)(TempCtrl_GetTempTarget()*10), (int)(TempCtrl_GetTempLatest()*10));
+			Shell_Print("TempCtrl Status: %s, Target: %d, Air: %d, Sink1: %d, Sink2: %d, Output: %d",
+					tempStatusStr[TempCtrl_GetStatus()], (int)(TempCtrl_GetTempTarget()*10), (int)(TempCtrl_GetTemp(TEMPERATURE_AIR_INDEX)*10),
+					(int)(TempCtrl_GetTemp(TEMPERATURE_SINK_1_INDEX)*10), (int)(TempCtrl_GetTemp(TEMPERATURE_SINK_2_INDEX)*10),(int)(TempCtrl_GetTemp(TEMPERATURE_OUTPUT_INDEX)*10));
 			break;
 		case 'I':
-			Shell_Print("TempCtrl Status: %s, Target: %d, Measured: %d, Kp: %d, Ki: %d",
+			Shell_Print("TempCtrl Status: %s, Target: %d, Air: %d, Kp: %d, Ki: %d",
 						tempStatusStr[TempCtrl_GetStatus()], (int)(TempCtrl_GetTempTarget()*10),
-						(int)(TempCtrl_GetTempLatest()*10), (int)(TempCtrl_GetKp()*100), (int)(TempCtrl_GetKi()*100));
+						(int)(TempCtrl_GetTemp(TEMPERATURE_AIR_INDEX)*10),
+						(int)(TempCtrl_GetTemp(TEMPERATURE_SINK_1_INDEX)*10),
+						(int)(TempCtrl_GetTemp(TEMPERATURE_SINK_2_INDEX)*10),
+						(int)(TempCtrl_GetTemp(TEMPERATURE_OUTPUT_INDEX)*10),
+						(int)(TempCtrl_GetKp()*100), (int)(TempCtrl_GetKi()*100));
 			break;
 		case 't':
 		case 'T':

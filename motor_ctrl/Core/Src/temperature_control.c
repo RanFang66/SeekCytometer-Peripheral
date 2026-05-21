@@ -226,10 +226,16 @@ float TempCtrl_GetTempTarget()
 	return tempCtrl.temp_target;
 }
 
-float TempCtrl_GetTempLatest()
+float TempCtrl_GetTemp(int index)
 {
-	return tempCtrl.temp_latest;
+	if (index < 0 || index >= TEMPERATURE_NTC_NUM) {
+		return index = 0;
+	}
+	return tempCtrl.temp_measured[index];
 }
+
+
+
 
 float TempCtrl_GetKp()
 {
@@ -405,7 +411,11 @@ static void TempCtrl_Task(void *arg)
 		}
 
 		// Update measured temperature
-		tempCtrl.temp_latest = NTC_ConvertToTemp(GetTempAdc());
+		tempCtrl.temp_measured[0] = NTC_ConvertToTemp(GetTempAdc_NTC1());
+		tempCtrl.temp_measured[1] = NTC_ConvertToTemp(GetTempAdc_NTC2());
+		tempCtrl.temp_measured[2] = NTC_ConvertToTemp(GetTempAdc_NTC3());
+		tempCtrl.temp_measured[3] = NTC_ConvertToTemp(GetTempAdc_NTC4());
+
 //		if (tempCtrl.temp_latest >= tempCtrl.temp_max || tempCtrl.temp_latest <= tempCtrl.temp_min) {
 //			tempCtrl.status = TEMP_CTRL_FAULT;
 //		}
@@ -418,7 +428,7 @@ static void TempCtrl_Task(void *arg)
 
 		if (tempCtrl.status == TEMP_CTRL_RUNNING) {
 			// Calculate PID output
-			float out = PID_Compute(tempCtrl.pid, -tempCtrl.temp_target, -tempCtrl.temp_latest, dt);
+			float out = PID_Compute(tempCtrl.pid, -tempCtrl.temp_target, -tempCtrl.temp_measured[TEMPERATURE_AIR_INDEX], dt);
 
 			// Update control output
 			UpdateTempCtrlOutput((uint16_t)out);

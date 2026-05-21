@@ -29,6 +29,8 @@ private slots:
     void onCloseCoverClicked();
     void onPressSampleClicked();
     void onReleaseSampleClicked();
+    void onResetSampleClicked();
+
     void onChurnCWClicked();
     void onChurnCCWClicked();
     void onChurnStopClicked();
@@ -91,6 +93,7 @@ private:
     QPushButton *btnCloseCover;
     QPushButton *btnPressSample;
     QPushButton *btnReleaseSample;
+    QPushButton *btnResetSampleChip;
 
     QPushButton *btnChurnRunCW;
     QPushButton *btnChurnRunCCW;

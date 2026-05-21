@@ -20,8 +20,11 @@ enum ADC_VALUE_INDEX {
 	LASER2_CURRENT_INDEX,
 	LASER2_POWER_INDEX,
 	LASER1_POWER_INDEX,
-	TEMP_INDEX,
+	TEMP_INDEX_NTC1,
 	LASER1_CURRENT_INDEX,
+	TEMP_INDEX_NTC3,
+	TEMP_INDEX_NTC2,
+	TEMP_INDEX_NTC4,
 };
 
 
@@ -90,10 +93,30 @@ uint16_t GetMotorCurrentAdc()
 	return adcFiltered[MOTOR_CURRENT_INDEX];
 }
 
-uint16_t GetTempAdc()
+
+uint16_t GetTempAdc_NTC1()
 {
-	return adcFiltered[TEMP_INDEX];
+	return adcFiltered[TEMP_INDEX_NTC1];
 }
+
+uint16_t GetTempAdc_NTC2()
+{
+	return adcFiltered[TEMP_INDEX_NTC2];
+}
+
+uint16_t GetTempAdc_NTC3()
+{
+	return adcFiltered[TEMP_INDEX_NTC3];
+}
+
+uint16_t GetTempAdc_NTC4()
+{
+	return adcFiltered[TEMP_INDEX_NTC4];
+}
+
+
+
+
 
 uint16_t GetLaser1CurrentAdc()
 {

@@ -14,7 +14,9 @@
 typedef enum {
 	SEAL_IDLE = 0,
 	SEAL_PUSHING,
+	SEAL_PUSHED,
 	SEAL_RELEASING,
+	SEAL_RELEASED,
 	SEAL_FAULT,
 } SealStatus_t;
 

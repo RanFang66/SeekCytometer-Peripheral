@@ -78,7 +78,7 @@ static void SealCtrl_Task(void *arg)
 		case SEAL_PUSHING:
 			if (isPushed) {
 				SealMotorStop();
-				sealCtrlCtx.status = SEAL_IDLE;
+				sealCtrlCtx.status = SEAL_PUSHED;
 			}
 			if (sealCtrlCtx.pushStartTimestamp + sealCtrlCtx.pushTimeLimit < currentTimeStamp) {
 				SealMotorStop();
@@ -90,7 +90,7 @@ static void SealCtrl_Task(void *arg)
 		case SEAL_RELEASING:
 			if (isReleased) {
 				SealMotorStop();
-				sealCtrlCtx.status = SEAL_IDLE;
+				sealCtrlCtx.status = SEAL_RELEASED;
 			}
 			if (currentTimeStamp > (sealCtrlCtx.releaseStartTime + sealCtrlCtx.releaseTimeLimit)) {
 				SealMotorStop();
@@ -112,7 +112,7 @@ static void SealCtrl_Task(void *arg)
 				break;
 			case SEAL_CMD_PUSH:
 				maxI = 0;
-				if (sealCtrlCtx.status != SEAL_FAULT && sealCtrlCtx.status != SEAL_PUSHING && !isPushed) {
+				if (sealCtrlCtx.status != SEAL_FAULT && sealCtrlCtx.status != SEAL_PUSHING) {
 					sealCtrlCtx.pushStartTimestamp = osKernelGetTickCount();
 					SealMotorPush();
 					sealCtrlCtx.status = SEAL_PUSHING;

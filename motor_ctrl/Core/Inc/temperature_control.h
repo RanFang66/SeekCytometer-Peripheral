@@ -46,6 +46,13 @@ typedef enum {
 	TEMP_CTRL_CMD_RESET,
 } TempCmdType_t;
 
+
+#define TEMPERATURE_NTC_NUM 			(4)
+#define TEMPERATURE_AIR_INDEX			(0)
+#define TEMPERATURE_SINK_1_INDEX		(1)
+#define TEMPERATURE_SINK_2_INDEX		(2)
+#define TEMPERATURE_OUTPUT_INDEX		(3)
+
 typedef struct {
 	TempCmdType_t 	cmdType;
 	float 			targetTemp;
@@ -61,7 +68,10 @@ typedef struct {
 	float 				temp_min;
 	float 				temp_max;
 	float 				temp_target;
-	float 				temp_latest;
+	float 				temp_measured[TEMPERATURE_NTC_NUM];
+
+
+
 	uint8_t 			peltier_enable[PELTIER_NUM];
 //	uint8_t 			fan_enable[COOL_FAN_NUM];
 //	uint16_t			fan_speed[COOL_FAN_NUM];
@@ -97,7 +107,7 @@ void TempCtrl_Stop();
 void TempCtrl_Reset();
 TempCtrlStatus_t TempCtrl_GetStatus();
 float TempCtrl_GetTempTarget();
-float TempCtrl_GetTempLatest();
+float TempCtrl_GetTemp(int index);
 float TempCtrl_GetKp();
 float TempCtrl_GetKi();
 uint8_t TempCtrl_GetFanStatus(uint8_t id);

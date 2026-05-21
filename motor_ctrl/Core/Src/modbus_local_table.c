@@ -73,6 +73,9 @@ uint16_t laser2Intensity;
 uint16_t ledStatus;
 uint16_t ledIntensity;
 uint16_t currentTemp;
+uint16_t sink1_temp;
+uint16_t sink2_temp;
+uint16_t output_temp;
 
 void MB_Local_RegInit(void)
 {
@@ -107,6 +110,10 @@ void MB_Local_RegInit(void)
 	MB_Slave_DefineReg(29, &fanChSpeedSet[3]);
 
 
+
+	MB_Slave_DefineReg(44, &sink1_temp);
+	MB_Slave_DefineReg(45, &sink2_temp);
+	MB_Slave_DefineReg(46, &output_temp);
 	MB_Slave_DefineReg(47, &tempCtrlStatus);
 	MB_Slave_DefineReg(48, &currentTemp);
 
@@ -134,15 +141,23 @@ void MB_Local_RegInit(void)
 
 void MB_UpdateStatus(void)
 {
-	coverStatus = Cover_GetStatus();
+	CoverStatus_t status = Cover_GetStatus();
+	CoverPos_t  pos = Cover_GetPos();
+	coverStatus = (uint16_t)status | ((uint16_t)pos << 8);
+
 	sealStatus = SealCtrl_GetStatus();
+
+
 	churnStatus = ChurnCtrl_GetStatus();
 	tempCtrlStatus = TempCtrl_GetStatus();
 	motorXStatus = SMotorCtrl_GetStatus(MOTOR_X);
 	motorYStatus = SMotorCtrl_GetStatus(MOTOR_Y);
 	motorZStatus = SMotorCtrl_GetStatus(MOTOR_Z);
-	float temp = TempCtrl_GetTempLatest();
+	float temp = TempCtrl_GetTemp(TEMPERATURE_AIR_INDEX);
 	currentTemp = temp * 10;
+	sink1_temp = TempCtrl_GetTemp(TEMPERATURE_SINK_1_INDEX) * 10;
+	sink2_temp = TempCtrl_GetTemp(TEMPERATURE_SINK_2_INDEX) * 10;
+	output_temp = TempCtrl_GetTemp(TEMPERATURE_OUTPUT_INDEX) * 10;
 
 	uint16_t limitX = SMotorCtrl_GetLimitStatus(MOTOR_X);
 	uint16_t limitY = SMotorCtrl_GetLimitStatus(MOTOR_Y);
