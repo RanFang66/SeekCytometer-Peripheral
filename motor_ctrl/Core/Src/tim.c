@@ -31,6 +31,10 @@ TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim9;
 TIM_HandleTypeDef htim12;
 
+/* USER CODE BEGIN GV */
+TIM_HandleTypeDef htim7;	/* software PWM time base for the DC churn motor */
+/* USER CODE END GV */
+
 /* TIM1 init function */
 void MX_TIM1_Init(void)
 {
@@ -443,6 +447,16 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 
   /* USER CODE END TIM12_MspInit 1 */
   }
+  /* USER CODE BEGIN TIM_Base_MspInit */
+  else if(tim_baseHandle->Instance==TIM7)
+  {
+    /* TIM7 clock enable */
+    __HAL_RCC_TIM7_CLK_ENABLE();
+    /* TIM7 interrupt Init (software PWM for the DC churn motor) */
+    HAL_NVIC_SetPriority(TIM7_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM7_IRQn);
+  }
+  /* USER CODE END TIM_Base_MspInit */
 }
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 {
@@ -649,8 +663,48 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 
   /* USER CODE END TIM12_MspDeInit 1 */
   }
+  /* USER CODE BEGIN TIM_Base_MspDeInit */
+  else if(tim_baseHandle->Instance==TIM7)
+  {
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM7_CLK_DISABLE();
+    HAL_NVIC_DisableIRQ(TIM7_IRQn);
+  }
+  /* USER CODE END TIM_Base_MspDeInit */
 }
 
 /* USER CODE BEGIN 1 */
+/* TIM7 init function: 1 MHz time base for the software PWM (DC churn motor). */
+void MX_TIM7_Init(void)
+{
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
+  /* Compute prescaler so that the TIM7 counter clock is 1 MHz (1 tick = 1 us),
+   * regardless of the APB1 clock configuration. */
+  uint32_t apb1TimClk;
+  if ((RCC->CFGR & RCC_CFGR_PPRE1) == RCC_HCLK_DIV1)
+  {
+    apb1TimClk = HAL_RCC_GetPCLK1Freq();
+  }
+  else
+  {
+    apb1TimClk = 2UL * HAL_RCC_GetPCLK1Freq();
+  }
+
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = (apb1TimClk / 1000000UL) - 1UL;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 199;  /* default 5 kHz period (200 us), reprogrammed by SwPwm */
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
 /* USER CODE END 1 */

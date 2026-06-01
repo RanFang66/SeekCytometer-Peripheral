@@ -31,6 +31,7 @@
 #include "debug_shell.h"
 #include "cover_control.h"
 #include "churn_control.h"
+#include "churn_control_dc.h"
 #include "seal_control.h"
 #include "stepper_motor_control.h"
 #include "temperature_control.h"
@@ -124,6 +125,8 @@ int main(void)
   CoverControl_Init();
   SealCtrl_Init();
   ChurnCtrl_Init();
+  MX_TIM7_Init();
+  ChurnDcCtrl_Init();
   TempCtrl_Init();
   MB_Master_Init();
   registerDebugCommands();

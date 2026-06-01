@@ -22,6 +22,7 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "swpwm.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -279,5 +280,13 @@ void DMA2_Stream0_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+
+/**
+  * @brief This function handles TIM7 global interrupt (software PWM time base).
+  */
+void TIM7_IRQHandler(void)
+{
+  SwPwm_HandleIRQ();
+}
 
 /* USER CODE END 1 */

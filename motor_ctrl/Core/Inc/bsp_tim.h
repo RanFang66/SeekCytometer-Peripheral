@@ -16,6 +16,9 @@
 #define CHURN_MOTOR_TIM		(htim9)
 #define CHURN_MOTOR_PWM_CH	(TIM_CHANNEL_1)
 
+// churn DC motor: software PWM time base, TIM7 (basic timer, no output pin)
+#define CHURN_DC_MOTOR_TIM	(htim7)
+
 
 // cover motor: TIM2 CH1
 #define COVER_MOTOR_TIM 	(htim2)

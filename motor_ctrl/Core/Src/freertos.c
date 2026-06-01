@@ -29,6 +29,7 @@
 #include "cover_control.h"
 #include "seal_control.h"
 #include "churn_control.h"
+#include "churn_control_dc.h"
 #include "stepper_motor_control.h"
 #include "temperature_control.h"
 #include "modbus_slave.h"
@@ -129,6 +130,7 @@ void MX_FREERTOS_Init(void) {
   CoverControl_StartTask();
   SealCtrl_StartTask();
   ChurnCtrl_StartTask();
+  ChurnDcCtrl_StartTask();
   MCP4728_Thread_Create();
 
   /* USER CODE END RTOS_THREADS */

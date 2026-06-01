@@ -12,6 +12,7 @@
 #include "seal_control.h"
 #include "bsp_adc.h"
 #include "churn_control.h"
+#include "churn_control_dc.h"
 #include "temperature_control.h"
 #include "stepper_motor_control.h"
 #include "laser_control.h"
@@ -250,6 +251,50 @@ static void ChurnControlCommand(int argc, char *argv[])
 	}
 }
 static DebugCommand_t churnCmd = {"churn", churnCmdHelp, ChurnControlCommand};
+
+
+const char churnDcCmdHelp[] = {"DC churn control, Use churndc -r <duty 0~100> / -s(stop) / -i(info)"};
+const char *churnDcStatusStr[] = {"IDLE", "RUNNING", "FAULT"};
+
+static void ChurnDcControlCommand(int argc, char *argv[])
+{
+	if (argc < 2 || argv[1][0] != '-') {
+		Shell_Print("\r\n>> %s", churnDcCmdHelp);
+		return;
+	}
+
+	uint8_t duty;
+	switch (argv[1][1]) {
+		case 'r':
+		case 'R':
+			if (argc < 3) {
+				Shell_Print("\r\n>> Use churndc -r <duty 0~100>");
+				return;
+			}
+			duty = (uint8_t)atoi(argv[2]);
+			if (duty > 100) {
+				duty = 100;
+			}
+			ChurnDcCtrl_Start(duty);
+			break;
+
+		case 's':
+		case 'S':
+			ChurnDcCtrl_Stop();
+			break;
+
+		case 'i':
+		case 'I':
+			Shell_Print("Churn DC Status: %s, Duty: %d%%",
+					churnDcStatusStr[ChurnDcCtrl_GetStatus()], ChurnDcCtrl_GetSpeed());
+			break;
+
+		default:
+			Shell_Print("\r\n>> %s", churnDcCmdHelp);
+			break;
+	}
+}
+static DebugCommand_t churnDcCmd = {"churndc", churnDcCmdHelp, ChurnDcControlCommand};
 
 
 
@@ -634,6 +679,13 @@ void registerDebugCommands(void)
 		LOG_INFO("Register churn command OK");
 	} else {
 		LOG_WARNING("Register churn command FAILED");
+	}
+
+	ret = Shell_RegisterCommand(&churnDcCmd);
+	if (ret) {
+		LOG_INFO("Register churn DC command OK");
+	} else {
+		LOG_WARNING("Register churn DC command FAILED");
 	}
 
 	ret = Shell_RegisterCommand(&tempCmd);
