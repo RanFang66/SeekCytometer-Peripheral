@@ -2,15 +2,17 @@
 # STM32CubeIDE / Eclipse workspace
 # ================================
 
-# Eclipse / CubeIDE metadata
+# Eclipse / CubeIDE metadata (machine/workspace specific)
 .settings/
 .metadata/
 .recommenders/
 *.launch
 
-# Project-specific IDE files (usually machine-dependent)
-*.cproject
-*.project
+# NOTE: .project and .cproject are intentionally tracked.
+# They contain the STM32CubeIDE project description and C/C++ build
+# configuration (toolchain, includes, defines, linker script). They are
+# cross-platform (Win/Linux/Mac) as long as the same CubeIDE version is used,
+# and are required for the project to be importable / buildable after clone.
 
 # ================================
 # Build output directories
