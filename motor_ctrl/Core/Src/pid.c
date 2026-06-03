@@ -14,13 +14,14 @@ static inline float clampf(float v, float lo, float hi)
     return v;
 }
 
-void PID_Init(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau,
+void PID_Init(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau, float feedforwardCoee,
 		float out_min, float out_max, float step_min, float step_max)
 {
 	pid->Kp = Kp;
 	pid->Ki = Ki;
 	pid->Kd = Kd;
 	pid->tau = (tau >= 0.0f) ? tau: 0.0f;
+	pid->feedforwardCoee = feedforwardCoee;
 	pid->out_min = out_min;
 	pid->out_max = out_max;
 	pid->step_min = step_min;
@@ -32,12 +33,13 @@ void PID_Init(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau,
 	pid->last_delta_u = 0.0f;
 }
 
-void PID_SetTunings(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau)
+void PID_SetTunings(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau, float feedforwardCoee)
 {
 	pid->Kp = Kp;
 	pid->Ki = Ki;
 	pid->Kd = Kd;
 	pid->tau = (tau >= 0.0f) ? tau: 0.0f;
+	pid->feedforwardCoee = feedforwardCoee;
 }
 
 void PID_SetOutputLimits(PID_HandleTypeDef *pid, float out_min, float out_max)
@@ -73,7 +75,7 @@ void PID_Reset(PID_HandleTypeDef *pid)
    ΔD_raw = Kd * (e[k] - 2e[k-1] + e[k-2]) / dt
   derivative is low-pass filtered: deltaD_f = deltaD_f_prev + alpha*(deltaD_raw - deltaD_f_prev)
 */
-float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float dt)
+float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float environmentTemp, float dt)
 {
     if (dt <= 0.0f) {
         return pid->prev_output;
@@ -110,12 +112,23 @@ float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float 
         tentative_delta_raw = deltaP + deltaI + deltaD_f;
     }
 
+
+
     /* Limit step increment */
     float tentative_delta = clampf(tentative_delta_raw, pid->step_min, pid->step_max);
     float tentative_u = pid->prev_output + tentative_delta;
 
+
+    /* feed forward calculate */
+	float feedforward = 0.0;
+	if (environmentTemp > setpoint) {
+		feedforward = pid->feedforwardCoee * (environmentTemp - setpoint);
+	}
+
+
+
     /* Limit output */
-    float u = clampf(tentative_u, pid->out_min, pid->out_max);
+    float u = clampf((tentative_u + feedforward), pid->out_min, pid->out_max);
 
     /* Update states */
     pid->last_delta_u = u - pid->prev_output;

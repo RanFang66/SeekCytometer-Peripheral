@@ -31,15 +31,18 @@ typedef struct {
 	float prev_prev_error;
 	float prev_output;
 
+	/* feed forward */
+	float feedforwardCoee;				// default: 0, do not enable feed forward
+
 	/* Derivative filter state */
 	float deltaD_f;
 
 	float last_delta_u;
 } PID_HandleTypeDef;;
 
-void PID_Init(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau, float out_min, float out_max, float step_min, float step_max);
+void PID_Init(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau, float feedforwardCoee, float out_min, float out_max, float step_min, float step_max);
 
-void PID_SetTunings(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau);
+void PID_SetTunings(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau, float feedforwardCoee);
 
 void PID_SetOutputLimits(PID_HandleTypeDef *pid, float out_min, float out_max);
 
@@ -47,7 +50,7 @@ void PID_SetStepLimits(PID_HandleTypeDef *pid, float step_min, float step_max);
 
 void PID_Reset(PID_HandleTypeDef *pid);
 
-float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float dt);
+float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float environmentTemp, float dt);
 
 
 

@@ -121,7 +121,7 @@ void TempCtrl_Init()
 	tempCtrl.fan[2] = &fan_3;
 	tempCtrl.fan[3] = &fan_4;
 
-	PID_Init(&pid, DEFAULT_KP, DEFAULT_KI, DEFAULT_KD, DEFAULT_TAU, DEFAULT_OUT_MIN, DEFAULT_OUT_MAX, DEFAULT_STEP_MIN, DEFAULT_STEP_MAX);
+	PID_Init(&pid, DEFAULT_KP, DEFAULT_KI, DEFAULT_KD, DEFAULT_TAU, DEFAULT_FEEDFORWARD_COEE, DEFAULT_OUT_MIN, DEFAULT_OUT_MAX, DEFAULT_STEP_MIN, DEFAULT_STEP_MAX);
 	tempCtrl.pid = &pid;
 	tempCtrl.temp_min = DEFAULT_TEMP_MIN;
 	tempCtrl.temp_max = DEFAULT_TEMP_MAX;
@@ -428,7 +428,8 @@ static void TempCtrl_Task(void *arg)
 
 		if (tempCtrl.status == TEMP_CTRL_RUNNING) {
 			// Calculate PID output
-			float out = PID_Compute(tempCtrl.pid, -tempCtrl.temp_target, -tempCtrl.temp_measured[TEMPERATURE_AIR_INDEX], dt);
+			float environmentTemp = 25.0; // default environment temperature, todo: get real ambient temperature
+			float out = PID_Compute(tempCtrl.pid, -tempCtrl.temp_target, -tempCtrl.temp_measured[TEMPERATURE_AIR_INDEX], 25.0, dt);
 
 			// Update control output
 			UpdateTempCtrlOutput((uint16_t)out);

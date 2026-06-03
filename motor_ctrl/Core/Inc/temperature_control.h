@@ -78,15 +78,17 @@ typedef struct {
 	TempCtrlStatus_t 	status;
 } TempCtrlCtx_t;
 
-#define DEFAULT_KP			3.0f
-#define DEFAULT_KI			8.0f
-#define DEFAULT_KD			0.0f
+#define DEFAULT_KP					3.0f
+#define DEFAULT_KI					8.0f
+#define DEFAULT_KD					0.0f
 
-#define DEFAULT_TAU			0.0f
-#define DEFAULT_OUT_MIN		0.0f
-#define DEFAULT_OUT_MAX 	10000.0f
-#define DEFAULT_STEP_MIN 	-1000.0f
-#define DEFAULT_STEP_MAX	1000.0f
+#define DEFAULT_TAU					0.0f
+#define DEFAULT_OUT_MIN				0.0f
+#define DEFAULT_OUT_MAX 			10000.0f
+#define DEFAULT_STEP_MIN 			-1000.0f
+#define DEFAULT_STEP_MAX			1000.0f
+#define DEFAULT_FEEDFORWARD_COEE 	100.0f
+
 
 #define DEFAULT_TEMP_MIN	-10.0f
 #define DEFAULT_TEMP_MAX	30.0f
