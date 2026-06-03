@@ -195,7 +195,7 @@ void TempCtrl_SetFanSpeed(uint8_t fanCh, uint16_t speed)
 {
 	TempCtrlCmd_t cmd = {.cmdType = TEMP_CTRL_FAN_SET_SPEED, .fanEn = fanCh};
 	for (uint8_t i = 0; i < COOL_FAN_NUM; ++i) {
-		if (fanCh & (0x01 << i)) {
+		if ((fanCh & ((uint8_t)0x01 << i))) {
 			cmd.fanSpeed[i] = speed;
 		}
 	}
