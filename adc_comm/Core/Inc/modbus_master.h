@@ -44,4 +44,7 @@ MB_Status_t MB_WriteMultipleRegs(target_t target, uint16_t startAddr, uint16_t q
 /* For called in HAL_UARTEx_RxEventCallback() */
 void MB_UART_HandleRxEvent(UART_HandleTypeDef *huart, uint16_t size);
 
+/* For called in HAL_UART_TxCpltCallback() */
+void MB_UART_HandleTxCplt(UART_HandleTypeDef *huart);
+
 #endif /* INC_MODBUS_MASTER_H_ */

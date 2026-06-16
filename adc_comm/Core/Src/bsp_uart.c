@@ -28,5 +28,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
+    // Master request TX (huart5/huart1/huart4) and slave response TX (huart6).
+    // Each handler filters by its own UART instance, so both are safe to call.
+    MB_UART_HandleTxCplt(huart);
     MB_SLAVE_UART_HandleTxCplt(huart);
 }
