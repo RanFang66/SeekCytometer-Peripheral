@@ -26,7 +26,7 @@ typedef enum {
 
 
 #define MB_MAX_FRAME_SIZE     		64     	// Modbus RTU max frame size
-#define MB_DEFAULT_TIMEOUT_MS 		300			// Transaction timeout
+#define MB_DEFAULT_TIMEOUT_MS 		500			// Transaction timeout
 
 
 #define MB_LOCAL_REG_START  	  	40001		// Start address of local holding register

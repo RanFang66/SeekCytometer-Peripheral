@@ -31,10 +31,6 @@ TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim9;
 TIM_HandleTypeDef htim12;
 
-/* USER CODE BEGIN GV */
-TIM_HandleTypeDef htim7;	/* software PWM time base for the DC churn motor */
-/* USER CODE END GV */
-
 /* TIM1 init function */
 void MX_TIM1_Init(void)
 {
@@ -294,7 +290,7 @@ void MX_TIM9_Init(void)
 
   /* USER CODE END TIM9_Init 1 */
   htim9.Instance = TIM9;
-  htim9.Init.Prescaler = 3;
+  htim9.Init.Prescaler = 41;
   htim9.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim9.Init.Period = 65535;
   htim9.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -447,16 +443,6 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 
   /* USER CODE END TIM12_MspInit 1 */
   }
-  /* USER CODE BEGIN TIM_Base_MspInit */
-  else if(tim_baseHandle->Instance==TIM7)
-  {
-    /* TIM7 clock enable */
-    __HAL_RCC_TIM7_CLK_ENABLE();
-    /* TIM7 interrupt Init (software PWM for the DC churn motor) */
-    HAL_NVIC_SetPriority(TIM7_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(TIM7_IRQn);
-  }
-  /* USER CODE END TIM_Base_MspInit */
 }
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 {
@@ -663,14 +649,6 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 
   /* USER CODE END TIM12_MspDeInit 1 */
   }
-  /* USER CODE BEGIN TIM_Base_MspDeInit */
-  else if(tim_baseHandle->Instance==TIM7)
-  {
-    /* Peripheral clock disable */
-    __HAL_RCC_TIM7_CLK_DISABLE();
-    HAL_NVIC_DisableIRQ(TIM7_IRQn);
-  }
-  /* USER CODE END TIM_Base_MspDeInit */
 }
 
 /* USER CODE BEGIN 1 */
@@ -708,3 +686,4 @@ void MX_TIM7_Init(void)
   }
 }
 /* USER CODE END 1 */
+

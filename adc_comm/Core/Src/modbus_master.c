@@ -134,15 +134,18 @@ static MB_Status_t ExecuteTransaction(MB_MasterCtx_t *ctx, uint16_t txPDUlen, ui
     // --- Response Validation ---
 
     // Check minimum length (ID, FC, Data/ExcepCode, CRC_L, CRC_H)
-    if (ctx->rxFrameLen < 5) return MB_ERROR_WRONG_RESPONSE;
+    if (ctx->rxFrameLen < 5)
+    	return MB_ERROR_WRONG_RESPONSE;
 
     // Check CRC
     uint16_t receivedCRC = (ctx->rxFrameBuffer[ctx->rxFrameLen - 1] << 8) | ctx->rxFrameBuffer[ctx->rxFrameLen - 2];
     uint16_t calculatedCRC = MB_CalculateCRC16(ctx->rxFrameBuffer, ctx->rxFrameLen - 2);
-    if (receivedCRC != calculatedCRC) return MB_ERROR_CRC;
+    if (receivedCRC != calculatedCRC)
+    	return MB_ERROR_CRC;
 
     // Check Slave ID
-    if (ctx->rxFrameBuffer[0] != ctx->addr) return MB_ERROR_WRONG_RESPONSE;
+    if (ctx->rxFrameBuffer[0] != ctx->addr)
+    	return MB_ERROR_WRONG_RESPONSE;
 
     // Check Function Code (Exception or Normal)
     uint8_t receivedFC = ctx->rxFrameBuffer[1];
