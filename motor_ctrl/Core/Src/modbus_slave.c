@@ -11,6 +11,11 @@
 
 static MB_SlaveCtx_t mbSlave;
 
+/* Thread flag used to signal the slave task that a DMA response transfer
+ * has fully completed (set from HAL_UART_TxCpltCallback). */
+#define MB_SLAVE_TXCPLT_FLAG    0x01U
+#define MB_SLAVE_TX_TIMEOUT_MS  100U
+
 extern void MB_Local_RegInit(void);
 extern void MB_UpdateStatus(void);
 extern void MB_CommandParse(void);
@@ -41,9 +46,27 @@ static HAL_StatusTypeDef SendResponse(MB_SlaveCtx_t *ctx, uint16_t pduLen)
     ctx->txBuffer[frameLen - 2] = crc & 0xFF;         // CRC Low
     ctx->txBuffer[frameLen - 1] = (crc >> 8) & 0xFF; // CRC High
 
-    // Blocking TX on the slave UART
-    HAL_StatusTypeDef st = HAL_UART_Transmit(ctx->huart, ctx->txBuffer, frameLen, 100);
-    return st;
+    /* Clear any stale TX-complete flag before starting a new transfer. */
+    osThreadFlagsClear(MB_SLAVE_TXCPLT_FLAG);
+
+    /* DMA TX: the whole frame is shifted out contiguously by the DMA engine,
+     * independent of RTOS task scheduling. This removes the inter-character
+     * gaps that a blocking, task-context HAL_UART_Transmit could introduce
+     * when preempted, which otherwise trip the master's UART IDLE-line
+     * detection and split one response into several short frames. */
+    HAL_StatusTypeDef st = HAL_UART_Transmit_DMA(ctx->huart, ctx->txBuffer, frameLen);
+    if (st != HAL_OK) {
+        return st;
+    }
+
+    /* Block until the transfer really completes (signalled from
+     * HAL_UART_TxCpltCallback) so txBuffer is not reused while still in flight. */
+    uint32_t flags = osThreadFlagsWait(MB_SLAVE_TXCPLT_FLAG, osFlagsWaitAny, MB_SLAVE_TX_TIMEOUT_MS);
+    if (flags & osFlagsError) {
+        HAL_UART_AbortTransmit(ctx->huart);
+        return HAL_TIMEOUT;
+    }
+    return HAL_OK;
 }
 
 /**
@@ -298,5 +321,18 @@ void MB_SLAVE_UART_HandleRxEvent(UART_HandleTypeDef *huart, uint16_t size)
 
 		// Re-start DMA for continuous monitoring (HAL does this, but good practice to ensure)
         HAL_UARTEx_ReceiveToIdle_DMA(huart, mbSlave.rxDMABuffer, MB_SLAVE_RX_BUFFER_SIZE);
+	}
+}
+
+
+/**
+ * @brief UART TX-complete handler for the Slave.
+ * Must be called from HAL_UART_TxCpltCallback() for the slave UART.
+ * Signals the slave task that the DMA response transfer has finished.
+ */
+void MB_SLAVE_UART_HandleTxCplt(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == mbSlave.huart->Instance && mbSlave.taskHandle != NULL) {
+		osThreadFlagsSet(mbSlave.taskHandle, MB_SLAVE_TXCPLT_FLAG);
 	}
 }

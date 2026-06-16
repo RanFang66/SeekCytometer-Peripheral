@@ -56,5 +56,8 @@ void MB_Slave_DefineReg(uint16_t idx, uint16_t *valP);
 // Must be called from HAL_UARTEx_RxEventCallback() for the slave UART (huart6)
 void MB_SLAVE_UART_HandleRxEvent(UART_HandleTypeDef *huart, uint16_t size);
 
+// Must be called from HAL_UART_TxCpltCallback() for the slave UART
+void MB_SLAVE_UART_HandleTxCplt(UART_HandleTypeDef *huart);
+
 
 #endif /* INC_MODBUS_SLAVE_H_ */

@@ -21,3 +21,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 	MB_UART_HandleRxEvent(huart, Size);
 	MB_SLAVE_UART_HandleRxEvent(huart, Size);
 }
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	MB_SLAVE_UART_HandleTxCplt(huart);
+}
