@@ -13,6 +13,10 @@
 
 static MB_MasterCtx_t mbMaster;
 
+/* Thread flags signalled to the task waiting inside ExecuteTransaction. */
+#define MB_MASTER_RESP_FLAG     0x01U   /* response frame received (RX IDLE)  */
+#define MB_MASTER_TXCPLT_FLAG   0x02U   /* request frame fully transmitted    */
+
 
 MB_Status_t MB_Master_Init()
 {
@@ -57,8 +61,11 @@ static HAL_StatusTypeDef SendRequest(uint16_t len)
     mbMaster.txBuffer[len] = crc & 0xFF;         // CRC Low
     mbMaster.txBuffer[len + 1] = (crc >> 8) & 0xFF; // CRC High
 
-    // Blocking TX (Master typically uses blocking TX)
-    return HAL_UART_Transmit(mbMaster.huart, mbMaster.txBuffer, len + 2, MB_DEFAULT_TIMEOUT_MS);
+    // DMA TX: the whole request frame is shifted out contiguously by the DMA
+    // engine, independent of RTOS/ISR load, so no inter-character gaps can make
+    // the downstream servo's RTU framing split the request. The caller waits for
+    // MB_MASTER_TXCPLT_FLAG (set from HAL_UART_TxCpltCallback after the last bit).
+    return HAL_UART_Transmit_DMA(mbMaster.huart, mbMaster.txBuffer, len + 2);
 
 }
 
@@ -82,17 +89,30 @@ static MB_Status_t ExecuteTransaction(uint8_t slaveId, uint16_t txPDUlen, uint8_
 		return MB_ERROR_HAL;
 	}
 
-    // 1. Send the Request
+    // Register the calling task BEFORE starting the transfer, so both the
+    // TX-complete callback and the RX-event callback can signal it.
+    mbMaster.callingTaskHandle = osThreadGetId();
+    osThreadFlagsClear(MB_MASTER_RESP_FLAG | MB_MASTER_TXCPLT_FLAG);
+
+    // 1. Send the Request (DMA, non-blocking)
     if (SendRequest(txPDUlen) != HAL_OK) {
+        mbMaster.callingTaskHandle = NULL;
         return MB_ERROR_TIMEOUT; // Or specific HAL error if desired
     }
 
+    // 1b. Wait until the request frame has been fully transmitted.
+    uint32_t txFlags = osThreadFlagsWait(MB_MASTER_TXCPLT_FLAG, osFlagsWaitAny, MB_DEFAULT_TIMEOUT_MS);
+    if (!(txFlags & MB_MASTER_TXCPLT_FLAG)) {
+    	HAL_UART_AbortTransmit_IT(mbMaster.huart);
+        mbMaster.callingTaskHandle = NULL;
+        return MB_ERROR_TIMEOUT;
+    }
+
     // 2. Wait for response signal (set by MB_UART_HandleRxEvent)
-    mbMaster.callingTaskHandle = osThreadGetId();
-    uint32_t flags = osThreadFlagsWait(0x01, osFlagsWaitAny, MB_DEFAULT_TIMEOUT_MS);
+    uint32_t flags = osThreadFlagsWait(MB_MASTER_RESP_FLAG, osFlagsWaitAny, MB_DEFAULT_TIMEOUT_MS);
     mbMaster.callingTaskHandle = NULL; // Clear handle
 
-    if (!(flags & 0x01)) {
+    if (!(flags & MB_MASTER_RESP_FLAG)) {
     	HAL_UART_AbortReceive_IT(mbMaster.huart);
         return MB_ERROR_TIMEOUT;
     }
@@ -277,8 +297,21 @@ void MB_UART_HandleRxEvent(UART_HandleTypeDef *huart, uint16_t size)
 			memcpy(mbMaster.rxFrameBuffer, mbMaster.rxDMABuffer, mbMaster.rxFrameLen);
 
 			/* 3. Signal the waiting application task */
-			osThreadFlagsSet(mbMaster.callingTaskHandle, 0x01);
+			osThreadFlagsSet(mbMaster.callingTaskHandle, MB_MASTER_RESP_FLAG);
 		}
+	}
+}
+
+
+/**
+ * @brief Public interface for HAL_UART_TxCpltCallback (master side).
+ * Signals the calling task that the request frame has been fully transmitted.
+ * Must be called inside HAL_UART_TxCpltCallback.
+ */
+void MB_UART_HandleTxCplt(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == mbMaster.huart->Instance && mbMaster.callingTaskHandle != NULL) {
+		osThreadFlagsSet(mbMaster.callingTaskHandle, MB_MASTER_TXCPLT_FLAG);
 	}
 }
 
