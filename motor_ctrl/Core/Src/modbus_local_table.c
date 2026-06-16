@@ -162,7 +162,7 @@ void MB_UpdateStatus(void)
 	uint16_t limitX = SMotorCtrl_GetLimitStatus(MOTOR_X);
 	uint16_t limitY = SMotorCtrl_GetLimitStatus(MOTOR_Y);
 	uint16_t limitZ = SMotorCtrl_GetLimitStatus(MOTOR_Z);
-	motorLimitStatus = ((limitZ & 0x0003) << 4) | ((limitY & 0x0003) << 2) | (limitX & 0x0003);
+	motorLimitStatus = ((limitZ & 0x000F) << 8) | ((limitY & 0x000F) << 4) | (limitX & 0x000F);
 	int32_t posX = SMotorCtrl_GetPos(MOTOR_X);
 	int32_t posY = SMotorCtrl_GetPos(MOTOR_Y);
 	int32_t posZ = SMotorCtrl_GetPos(MOTOR_Z);
@@ -294,7 +294,9 @@ void MB_CommandParse(void)
 	}
 
 	if (ctrlWord.bits.SMotorCtrl && !lastCtrlWord.bits.SMotorCtrl) {
-		uint8_t cmdType = motorCmd & 0x00FF;
+		// bit8: if set will enable the collision avoidance feature will enable, that is when x, y motor runs z motor position must be less then 20000
+		uint8_t enCollisionAvoid = (motorCmd & 0x0080) >> 7;
+		uint8_t cmdType = motorCmd & 0x007F;
 		uint8_t id = (motorCmd >> 8) & 0x00FF;
 		int32_t val = 0;
 		switch (cmdType) {
@@ -304,12 +306,12 @@ void MB_CommandParse(void)
 
 		case STEPPER_MOTOR_RUN_STEPS:
 			val = (int32_t)((motorTargetSetHi << 16) | (motorTargetSetLo));
-			SMotorCtrl_RunSteps(id, val);
+			SMotorCtrl_RunSteps(id, val, enCollisionAvoid);
 			break;
 
 		case STEPPER_MOTOR_RUN_POS:
 			val = (int32_t)((motorTargetSetHi << 16) | (motorTargetSetLo));
-			SMotorCtrl_RunToPos(id, val);
+			SMotorCtrl_RunToPos(id, val, enCollisionAvoid);
 			break;
 
 		case STEPPER_MOTOR_FIND_HOME:

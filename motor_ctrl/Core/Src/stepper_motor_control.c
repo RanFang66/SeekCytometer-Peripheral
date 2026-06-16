@@ -287,7 +287,7 @@ static void SMotorCtrl_Task(void *arg)
 				StepperMotor_Stop(cmd.motorId);
 				break;
 			case STEPPER_MOTOR_RUN_STEPS:
-				if ((cmd.motorId == MOTOR_X || cmd.motorId == MOTOR_Y) && CtrlCtx[MOTOR_Z].motorPos < 20000) {
+				if (cmd.enCollisionAvoid  && (cmd.motorId == MOTOR_X || cmd.motorId == MOTOR_Y) && CtrlCtx[MOTOR_Z].motorPos < 20000) {
 					uint16_t tCount = 0;
 					StepperMotor_RunToPos(MOTOR_Z, 22000);
 					do {
@@ -304,7 +304,7 @@ static void SMotorCtrl_Task(void *arg)
 				StepperMotor_RunSteps(cmd.motorId, cmd.cmdData);
 				break;
 			case STEPPER_MOTOR_RUN_POS:
-				if ((cmd.motorId == MOTOR_X || cmd.motorId == MOTOR_Y) && CtrlCtx[MOTOR_Z].motorPos < 20000) {
+				if (cmd.enCollisionAvoid  && (cmd.motorId == MOTOR_X || cmd.motorId == MOTOR_Y) && CtrlCtx[MOTOR_Z].motorPos < 20000) {
 					uint16_t tCount = 0;
 					StepperMotor_RunToPos(MOTOR_Z, 22000);
 					do {
@@ -364,17 +364,17 @@ void SMotorCtrl_StartTask()
 	}
 }
 
-void SMotorCtrl_RunToPos(SMotorIndex_t id, int32_t pos)
+void SMotorCtrl_RunToPos(SMotorIndex_t id, int32_t pos, uint8_t enCollisionAvoid)
 {
-	SMotorCmd_t cmd = {.cmdType = STEPPER_MOTOR_RUN_POS, .motorId = id, .cmdData = pos};
+	SMotorCmd_t cmd = {.cmdType = STEPPER_MOTOR_RUN_POS, .motorId = id, .cmdData = pos, .enCollisionAvoid = enCollisionAvoid};
 	osStatus_t st = osMessageQueuePut(SMotorCmdQueue, &cmd, 0, 100);
 	if (st != osOK) {
 		LOG_WARNING("Send stepper motor RUN TO POS command FAILED!");
 	}
 }
-void SMotorCtrl_RunSteps(SMotorIndex_t id, int32_t steps)
+void SMotorCtrl_RunSteps(SMotorIndex_t id, int32_t steps, uint8_t enCollisionAvoid)
 {
-	SMotorCmd_t cmd = {.cmdType = STEPPER_MOTOR_RUN_STEPS, .motorId = id, .cmdData = steps};
+	SMotorCmd_t cmd = {.cmdType = STEPPER_MOTOR_RUN_STEPS, .motorId = id, .cmdData = steps, .enCollisionAvoid = enCollisionAvoid};
 	osStatus_t st = osMessageQueuePut(SMotorCmdQueue, &cmd, 0, 100);
 	if (st != osOK) {
 		LOG_WARNING("Send stepper motor RUN STEPS command FAILED!");

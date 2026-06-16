@@ -485,24 +485,42 @@ static void SMotorControlCommand(int argc, char *argv[])
 			break;
 
 		case 'm':
+			if (argc < 4) {
+				Shell_Print("\r\n>> Use motor -m <id> <steps>");
+				return;
+			}
+			val = atoi(argv[3]);
+			SMotorCtrl_RunSteps(id, val, 0);
+			break;
+
 		case 'M':
 			if (argc < 4) {
 				Shell_Print("\r\n>> Use motor -m <id> <steps>");
 				return;
 			}
 			val = atoi(argv[3]);
-			SMotorCtrl_RunSteps(id, val);
+			SMotorCtrl_RunSteps(id, val, 1);
 			break;
 
+
 		case 'p':
+			if (argc < 4) {
+				Shell_Print("\r\n>> Use motor -p <id> <pos>");
+				return;
+			}
+			val = atoi(argv[3]);
+			SMotorCtrl_RunToPos(id, val, 0);
+			break;
+
 		case 'P':
 			if (argc < 4) {
 				Shell_Print("\r\n>> Use motor -p <id> <pos>");
 				return;
 			}
 			val = atoi(argv[3]);
-			SMotorCtrl_RunToPos(id, val);
+			SMotorCtrl_RunToPos(id, val, 1);
 			break;
+
 
 		case 'i':
 		case 'I':

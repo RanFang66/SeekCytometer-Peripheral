@@ -58,12 +58,13 @@ typedef struct {
 	SMotorCmdType_t 	cmdType;
 	SMotorIndex_t 		motorId;
 	int32_t 			cmdData;
+	uint8_t				enCollisionAvoid;
 } SMotorCmd_t;
 
 void SMotorCtrl_Init();
 void SMotorCtrl_StartTask();
-void SMotorCtrl_RunToPos(SMotorIndex_t id, int32_t pos);
-void SMotorCtrl_RunSteps(SMotorIndex_t id, int32_t steps);
+void SMotorCtrl_RunToPos(SMotorIndex_t id, int32_t pos, uint8_t enAvoidCollision);
+void SMotorCtrl_RunSteps(SMotorIndex_t id, int32_t steps, uint8_t enAvoidCollision);
 void SMotorCtrl_Stop(SMotorIndex_t id);
 void SMotorCtrl_FindHome(SMotorIndex_t id);
 void SMotorCtrl_Reset(SMotorIndex_t id);
