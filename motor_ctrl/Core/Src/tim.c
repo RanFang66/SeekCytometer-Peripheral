@@ -652,10 +652,21 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 }
 
 /* USER CODE BEGIN 1 */
+/* Software-PWM time base handle for the DC churn motor.
+ * Defined here (USER CODE 1, file scope) instead of in the generated GV
+ * section so a CubeMX re-generation of tim.c cannot wipe it. */
+TIM_HandleTypeDef htim7;	/* software PWM time base for the DC churn motor */
+
 /* TIM7 init function: 1 MHz time base for the software PWM (DC churn motor). */
 void MX_TIM7_Init(void)
 {
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* TIM7 clock + NVIC enabled here instead of in HAL_TIM_Base_MspInit(),
+   * so a CubeMX re-generation cannot wipe the TIM7 setup. */
+  __HAL_RCC_TIM7_CLK_ENABLE();
+  HAL_NVIC_SetPriority(TIM7_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(TIM7_IRQn);
 
   /* Compute prescaler so that the TIM7 counter clock is 1 MHz (1 tick = 1 us),
    * regardless of the APB1 clock configuration. */
