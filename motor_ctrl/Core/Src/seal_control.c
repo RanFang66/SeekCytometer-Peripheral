@@ -27,9 +27,18 @@ void SealCtrl_Init()
 	sealCtrlCtx.releaseSpeed = DEFAULT_RELEASE_SPEED;
 	sealCtrlCtx.pushTimeLimit = DEFAULT_PUSH_TIME_LIMIT;
 	sealCtrlCtx.releaseTimeLimit = DEFAULT_RELEASE_TIME_LIMIT;
-	sealCtrlCtx.pushedCurrentThresh = DEFAULT_PUSH_CURRENT_THRESH;
+	sealCtrlCtx.releaseCurrentThresh = DEFAULT_RELEASE_CURRENT_THRESH;
 	sealCtrlCtx.motorCurrentFaultThresh = DEFAULT_MOTOR_FAULT_THRESH;
+	sealCtrlCtx.pushMinTimeSpan = DEFAULT_PUSH_MIN_TIME;
+	sealCtrlCtx.releaseMinTimeSpan = DEFAULT_RELEASE_MIN_TIME;
 }
+
+uint8_t SealCtrl_SealPushed()
+{
+	GPIO_PinState st = HAL_GPIO_ReadPin(SEAL_PUSHED_GPIO, SEAL_PUSHED_PIN);
+	return (uint8_t)st;
+}
+
 
 uint8_t SealCtrl_SealReleased()
 {
@@ -58,7 +67,7 @@ static void SealCtrl_Task(void *arg)
 
 	for (;;) {
 		// Update Status
-		isReleased = SealCtrl_SealReleased();
+		isPushed = SealCtrl_SealPushed();
 		motorI = GetMotorCurrentAdc();
 		if (motorI > maxI) {
 			maxI = motorI;
@@ -67,36 +76,32 @@ static void SealCtrl_Task(void *arg)
 		if (motorI > sealCtrlCtx.motorCurrentFaultThresh && sealCtrlCtx.status != SEAL_FAULT) {
 			SealMotorStop();
 			sealCtrlCtx.status = SEAL_FAULT;
-//			LOG_ERROR("Seal Motor over current FAULT!");
 		}
 
 
-		isPushed = (motorI >= sealCtrlCtx.pushedCurrentThresh);
+//		isReleased = (motorI >= sealCtrlCtx.releaseCurrentThresh);
+		isReleased = SealCtrl_SealReleased();
 		currentTimeStamp = osKernelGetTickCount();
 		// Handle position changed
 		switch (sealCtrlCtx.status) {
 		case SEAL_PUSHING:
-			if (isPushed) {
+			if (sealCtrlCtx.pushStartTimestamp + sealCtrlCtx.pushMinTimeSpan > currentTimeStamp && isPushed) {
 				SealMotorStop();
 				sealCtrlCtx.status = SEAL_PUSHED;
 			}
 			if (sealCtrlCtx.pushStartTimestamp + sealCtrlCtx.pushTimeLimit < currentTimeStamp) {
 				SealMotorStop();
 				sealCtrlCtx.status = SEAL_FAULT;
-//				LOG_ERROR("Seal push timeout!");
-
 			}
 			break;
 		case SEAL_RELEASING:
-			if (isReleased) {
+			if (currentTimeStamp > (sealCtrlCtx.releaseStartTime + sealCtrlCtx.releaseMinTimeSpan) && isReleased) {
 				SealMotorStop();
 				sealCtrlCtx.status = SEAL_RELEASED;
 			}
 			if (currentTimeStamp > (sealCtrlCtx.releaseStartTime + sealCtrlCtx.releaseTimeLimit)) {
 				SealMotorStop();
 				sealCtrlCtx.status = SEAL_FAULT;
-//				LOG_ERROR("Seal release timeout!");
-
 			}
 			break;
 		default:
@@ -155,7 +160,7 @@ void sealCtrl_SetMotorFaultThresh(uint16_t thresh)
 
 void sealCtrl_SetMotorPushedThresh(uint16_t thresh)
 {
-	sealCtrlCtx.pushedCurrentThresh = thresh;
+	sealCtrlCtx.releaseCurrentThresh = thresh;
 }
 
 void SealCtrl_SetPushSpeed(uint16_t speed)
@@ -209,7 +214,7 @@ uint16_t SealCtrl_GetFaultCurrThresh()
 
 uint16_t SealCtrl_GetPushedCurrThresh()
 {
-	return sealCtrlCtx.pushedCurrentThresh;
+	return sealCtrlCtx.releaseCurrentThresh;
 }
 
 

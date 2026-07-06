@@ -83,7 +83,7 @@ static void CoverControlCommand(int argc, char *argv[])
 static DebugCommand_t coverCmd = {"cover", coverCmdHelp, CoverControlCommand};
 
 static const char sealCmdHelp[]  = "Control seal(push, release), Use seal -p/r/s/i/...";
-static const char *sealStatusStr[] = {"IDLE", "PUSHING", "RELEASING", "FAULT"};
+static const char *sealStatusStr[] = {"IDLE", "PUSHING", "PUSHED", "RELEASING", "RELEASED","FAULT"};
 extern uint16_t getMaxI();
 static void SealControlCommand(int argc, char *argv[])
 {
@@ -119,14 +119,14 @@ static void SealControlCommand(int argc, char *argv[])
 		break;
 
 	case 'i':
-		Shell_Print("\r\n Seal Status: %s, Seal Motor Current: %d, is Released: %d, maxI: %d",
-				sealStatusStr[SealCtrl_GetStatus()], GetMotorCurrentAdc(), SealCtrl_SealReleased(), getMaxI());
+		Shell_Print("\r\n Seal Status: %s, Seal Motor Current: %d, Sensor IO: %d, maxI: %d",
+				sealStatusStr[SealCtrl_GetStatus()], GetMotorCurrentAdc(), SealCtrl_SealPushed(), getMaxI());
 		break;
 
 
 	case 'I':
-		Shell_Print("\r\n Seal Status: %s, Seal Motor Current: %d, is Released: %d, Speed: %d(push), %d(release), time limit: (push)%d, (release)%d, fault current: %d, release current: %d",
-				sealStatusStr[SealCtrl_GetStatus()], GetMotorCurrentAdc(), SealCtrl_SealReleased(),
+		Shell_Print("\r\n Seal Status: %s, Seal Motor Current: %d, Sensor IO: %d, Speed: %d(push), %d(release), time limit: (push)%d, (release)%d, fault current: %d, release current: %d",
+				sealStatusStr[SealCtrl_GetStatus()], GetMotorCurrentAdc(), SealCtrl_SealPushed(),
 				SealCtrl_GetPushSpeed(), SealCtrl_GetReleaseSpeed(),
 				SealCtrl_GetPushTimeLimit(), SealCtrl_GetReleaseTimeLimit(),
 				SealCtrl_GetFaultCurrThresh(), SealCtrl_GetPushedCurrThresh());

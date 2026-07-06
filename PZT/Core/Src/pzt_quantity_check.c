@@ -5,6 +5,7 @@
 #include "stdio.h"
 #include "step_motor_driver.h"
 #include "math.h"
+#include "MCP4728.h"
 #include "stdlib.h"
 
 #define SW1_H HAL_GPIO_WritePin(SW1_GPIO_Port, SW1_Pin, GPIO_PIN_SET)

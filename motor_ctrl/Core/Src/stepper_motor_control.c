@@ -59,13 +59,19 @@ void ConfigOneMotor(SMotorIndex_t id)
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_LEVEL, DI_HIGH_VALID);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_FUNC, DI_FUNC_UNUSED);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_LEVEL, DI_HIGH_VALID);
+		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_POS_POLARITY, POS_POLARITY_POS);
 	} else if (id == MOTOR_Y) {
 //		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_FUNC, DI_FUNC_NEGA_LIMIT);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_FUNC, DI_FUNC_HOME);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_LEVEL, DI_HIGH_VALID);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_FUNC, DI_FUNC_POS_LIMIT);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_LEVEL, DI_HIGH_VALID);
-//		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_POS_POLARITY, POS_POLARITY_INVERT);
+//		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_FUNC, DI_FUNC_POS_LIMIT);
+//		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI2_LEVEL, DI_HIGH_VALID);
+//		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_FUNC, DI_FUNC_HOME);
+//		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_LEVEL, DI_HIGH_VALID);
+		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_POS_POLARITY, POS_POLARITY_POS);
+
 	} else if (id == MOTOR_Z) {
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_FUNC, DI_FUNC_HOME);
 		st = MB_WriteSingleReg(CtrlCtx[id].motorAddr, REG_DI1_LEVEL, DI_HIGH_VALID);
@@ -200,14 +206,14 @@ void SMotorCtrl_Init()
 	CtrlCtx[MOTOR_X].accSpeed = 100000;
 	CtrlCtx[MOTOR_X].descSpeed = 100000;
 	CtrlCtx[MOTOR_X].resetTimeLimit = 10000;
-	CtrlCtx[MOTOR_X].homeModeType = HOME_MODE_ORIGIN_21;
+	CtrlCtx[MOTOR_X].homeModeType = HOME_MODE_ORIGIN_20;
 
 	CtrlCtx[MOTOR_Y].name = 'Y';
 	CtrlCtx[MOTOR_Y].speed = 50000;
 	CtrlCtx[MOTOR_Y].accSpeed = 100000;
 	CtrlCtx[MOTOR_Y].descSpeed = 100000;
 	CtrlCtx[MOTOR_Y].resetTimeLimit = 18000;
-	CtrlCtx[MOTOR_Y].homeModeType = HOME_MODE_ORIGIN_21;//HOME_MODE_NEGA_LIMIT;
+	CtrlCtx[MOTOR_Y].homeModeType = HOME_MODE_ORIGIN_21;
 
 	CtrlCtx[MOTOR_Z].name = 'Z';
 	CtrlCtx[MOTOR_Z].speed = 50000;

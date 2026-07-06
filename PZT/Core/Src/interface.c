@@ -32,6 +32,10 @@ static void motor_move_config(StepMotor_t *motor, int32_t steps, uint16_t period
 	step_motor_set_period_steps(motor, period, abs(steps));
 	step_motor_start(motor);
 }
+
+
+void linear_fit(int16_t *x, int16_t *y, uint16_t size, float *k, float *b);
+
 int16_t x[10] = {836, 758, 676, 593, 513, 431, 348, 263, 180, 99};
 int16_t y[10] = {100,  90,  80, 70,   60,  50,  40,  30,  20, 10};
 static MODBUS_CMD_STATE run_cmd_idle(void)

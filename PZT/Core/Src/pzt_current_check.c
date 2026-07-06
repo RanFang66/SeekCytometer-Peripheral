@@ -1,6 +1,9 @@
 #include "pzt_current_check.h"
 #include "time.h"
 #include "string.h"
+#include "stdio.h"
+#include "interface.h"
+
 static uint16_t pzt_check_adc_buffer[2048][2];
 static uint32_t d_tick, tick;
 //static uint16_t adc_active_threshold = 1700;
@@ -222,7 +225,7 @@ void pzt_check(void)
 			}
 			uint8_t send_buffer[40];
 			sprintf(send_buffer, "peak %d\t%d", pcc_ch1.peak_ave, pcc_ch2.peak_ave);
-			interface_send(send_buffer, strlen(send_buffer));
+//			interface_send(send_buffer, strlen(send_buffer));
 //			if (adc_active_pick_count) {
 //				adc_active_pick_ave = adc_active_pick_sum / adc_active_pick_count;
 //				adc_active_pick_sum = 0;

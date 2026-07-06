@@ -27,6 +27,7 @@
 #include "pzt_quantity_check.h"
 #include "step_motor_driver.h"
 #include "mb.h"
+#include "mbrtu.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

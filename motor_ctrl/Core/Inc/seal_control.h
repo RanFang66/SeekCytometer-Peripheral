@@ -35,8 +35,10 @@ typedef struct {
 	uint16_t 			pushSpeed;
 	uint16_t			releaseSpeed;
 	uint16_t			motorCurrentFaultThresh;
-	uint16_t			pushedCurrentThresh;
+	uint16_t			releaseCurrentThresh;
 	uint16_t			pushTimeLimit;
+	uint16_t			pushMinTimeSpan;
+	uint16_t			releaseMinTimeSpan;
 	uint16_t			releaseTimeLimit;
 	uint32_t			pushStartTimestamp;
 	uint32_t			releaseStartTime;
@@ -51,15 +53,18 @@ typedef struct {
  * When motor is stalling to push, the motor stall current is 400~500
  * So the suggested pushed motor current threshold value is 150~350
  * */
-#define DEFAULT_PUSH_SPEED				(4000)
-#define DEFAULT_RELEASE_SPEED 			(4000)
-#define DEFAULT_PUSH_TIME_LIMIT			(3000)
-#define DEFAULT_RELEASE_TIME_LIMIT		(3000)
-#define DEFAULT_PUSH_CURRENT_THRESH		(300)
-#define DEFAULT_MOTOR_FAULT_THRESH		(500)
+#define DEFAULT_PUSH_SPEED				(6000)
+#define DEFAULT_RELEASE_SPEED 			(8000)
+#define DEFAULT_PUSH_TIME_LIMIT			(6000)
+#define DEFAULT_RELEASE_TIME_LIMIT		(6000)
+#define DEFAULT_RELEASE_CURRENT_THRESH	(350)
+#define DEFAULT_MOTOR_FAULT_THRESH		(2000)
+#define DEFAULT_PUSH_MIN_TIME			(2000)
+#define DEFAULT_RELEASE_MIN_TIME		(2000)
 
 void SealCtrl_Init();
 SealStatus_t SealCtrl_GetStatus();
+uint8_t SealCtrl_SealPushed();
 uint8_t SealCtrl_SealReleased();
 void sealCtrl_SetMotorFaultThresh(uint16_t thresh);
 void sealCtrl_SetMotorPushedThresh(uint16_t thresh);
