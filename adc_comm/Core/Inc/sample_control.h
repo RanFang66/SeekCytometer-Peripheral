@@ -9,6 +9,7 @@
 #define INC_SAMPLE_CONTROL_H_
 
 #include "dac8568.h"
+#include "ad5724r.h"
 
 
 //#define CHANNEL_NUM (8)	// 8 sample channels
@@ -47,8 +48,9 @@ typedef struct {
 
 
 typedef struct {
-	dac8568_channel_t gainCh;
-	dac8568_channel_t refCh;
+	dac8568_channel_t gainCh;   // Gain DAC8568 channel
+	uint8_t           refChip;  // Reference AD5724R index (0 or 1)
+	ad5724r_channel_t refCh;    // Reference AD5724R channel (A..D)
 	uint16_t gain;
 	uint16_t ref;
 } sample_para_t;

@@ -61,6 +61,10 @@ void Error_Handler(void);
 #define SYNC1_GPIO_Port GPIOA
 #define SYNC2_Pin GPIO_PIN_4
 #define SYNC2_GPIO_Port GPIOC
+#define ref_cs1_Pin GPIO_PIN_0
+#define ref_cs1_GPIO_Port GPIOB
+#define ref_cs2_Pin GPIO_PIN_1
+#define ref_cs2_GPIO_Port GPIOB
 #define LED_Pin GPIO_PIN_15
 #define LED_GPIO_Port GPIOA
 

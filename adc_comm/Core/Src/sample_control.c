@@ -8,6 +8,8 @@
 
 #include "sample_control.h"
 #include "spi.h"
+#include "gpio.h"
+#include "main.h"
 #include "cmsis_os2.h"
 #include "debug_shell.h"
 
@@ -17,17 +19,30 @@
 
 #define GAIN_CTRL_SYNC_GPIO		GPIOA
 #define GAIN_CTRL_SYNC_PIN		GPIO_PIN_4
-#define REF_CTRL_SYNC_GPIO		GPIOC
-#define REF_CTRL_SYNC_PIN		GPIO_PIN_4
+
+// Two AD5724R share hspi1 with the gain DAC8568; each has its own chip select.
+// ref_cs1 (PB0) drives channels 1-4, ref_cs2 (PB1) drives channels 5-8.
+#define REF_CTRL_CS1_GPIO		ref_cs1_GPIO_Port
+#define REF_CTRL_CS1_PIN		ref_cs1_Pin
+#define REF_CTRL_CS2_GPIO		ref_cs2_GPIO_Port
+#define REF_CTRL_CS2_PIN		ref_cs2_Pin
+
+#define REF_CHIP_NUM			2
+
+// AD5724R uses an internal 2.5 V reference with the +-5 V bipolar range.
+#define REF_OUTPUT_RANGE		AD5724R_RANGE_BI_5V
+#define REF_USE_INTERNAL_REF	true
 
 // Default gain and reference definition
 #define GAIN_DEFAULT_VALUE 		1
+// Bipolar offset-binary midscale (0x8000) corresponds to 0 V output.
 #define REF_DEFAULT_VALUE		32768
 
 
-// DAC8568 Instance
+// Gain DAC8568 instance
 static dac8568_t gainDAC;
-static dac8568_t refDAC;
+// Reference AD5724R instances: [0] -> ref_cs1 (CH1-4), [1] -> ref_cs2 (CH5-8)
+static ad5724r_t refDAC[REF_CHIP_NUM];
 
 
 /* Variables for modbus communication */
@@ -48,15 +63,23 @@ static const dac8568_channel_t GAINS_CH_LIST[CHANNEL_NUM] = {
 		DAC8568_CH_A
 };
 
-static const dac8568_channel_t REFS_CH_LIST[CHANNEL_NUM] = {
-		DAC8568_CH_B,
-		DAC8568_CH_D,
-		DAC8568_CH_F,
-		DAC8568_CH_H,
-		DAC8568_CH_G,
-		DAC8568_CH_E,
-		DAC8568_CH_C,
-		DAC8568_CH_A
+// Reference channel map: which AD5724R chip and channel drives each sample
+// channel. Chip 0 (ref_cs1) serves CH1-4, chip 1 (ref_cs2) serves CH5-8.
+// Adjust the {chip, channel} pairs here to match the PCB routing if needed.
+typedef struct {
+	uint8_t           chip;
+	ad5724r_channel_t ch;
+} ref_map_t;
+
+static const ref_map_t REFS_MAP[CHANNEL_NUM] = {
+		{0, AD5724R_CH_A},
+		{0, AD5724R_CH_B},
+		{0, AD5724R_CH_C},
+		{0, AD5724R_CH_D},
+		{1, AD5724R_CH_A},
+		{1, AD5724R_CH_B},
+		{1, AD5724R_CH_C},
+		{1, AD5724R_CH_D},
 };
 
 
@@ -67,7 +90,8 @@ HAL_StatusTypeDef SampleCtrl_Init()
 
 	for (sample_ch_t ch = SAMPLE_CH1; ch < CHANNEL_NUM; ++ch) {
 		samplePara[ch].gainCh = GAINS_CH_LIST[ch];
-		samplePara[ch].refCh = REFS_CH_LIST[ch];
+		samplePara[ch].refChip = REFS_MAP[ch].chip;
+		samplePara[ch].refCh = REFS_MAP[ch].ch;
 		samplePara[ch].gain = GAIN_DEFAULT_VALUE;
 		samplePara[ch].ref = REF_DEFAULT_VALUE;
 	}
@@ -78,7 +102,14 @@ HAL_StatusTypeDef SampleCtrl_Init()
 		return st;
 	}
 
-	st = DAC8568_Init(&refDAC, &REF_CTRL_SPI, REF_CTRL_SYNC_GPIO, REF_CTRL_SYNC_PIN, false, 3.3);
+	st = AD5724R_Init(&refDAC[0], &REF_CTRL_SPI, REF_CTRL_CS1_GPIO, REF_CTRL_CS1_PIN,
+			REF_OUTPUT_RANGE, REF_USE_INTERNAL_REF);
+	if (st != HAL_OK) {
+		return st;
+	}
+
+	st = AD5724R_Init(&refDAC[1], &REF_CTRL_SPI, REF_CTRL_CS2_GPIO, REF_CTRL_CS2_PIN,
+			REF_OUTPUT_RANGE, REF_USE_INTERNAL_REF);
 	if (st != HAL_OK) {
 		return st;
 	}
@@ -90,9 +121,11 @@ HAL_StatusTypeDef SampleCtrl_Init()
 		return st;
 	}
 
-	st = DAC8568_BroadcastWriteUpdate(&refDAC, REF_DEFAULT_VALUE);
-	if (st != HAL_OK) {
-		return st;
+	for (uint8_t chip = 0; chip < REF_CHIP_NUM; ++chip) {
+		st = AD5724R_BroadcastWriteUpdate(&refDAC[chip], REF_DEFAULT_VALUE);
+		if (st != HAL_OK) {
+			return st;
+		}
 	}
 
 	return HAL_OK;
@@ -158,7 +191,8 @@ HAL_StatusTypeDef SampleCtrl_SetChRef(sample_ch_t channel, uint16_t ref)
 	}
 
 	samplePara[channel].ref = ref;
-	return DAC8568_WriteInputOnly(&refDAC, samplePara[channel].refCh, ref);
+	return AD5724R_WriteInputOnly(&refDAC[samplePara[channel].refChip],
+			samplePara[channel].refCh, ref);
 }
 
 HAL_StatusTypeDef SampleCtrl_SetChRefAndUpdate(sample_ch_t channel, uint16_t ref)
@@ -167,13 +201,21 @@ HAL_StatusTypeDef SampleCtrl_SetChRefAndUpdate(sample_ch_t channel, uint16_t ref
 		return HAL_ERROR;
 	}
 	samplePara[channel].ref = ref;
-	return DAC8568_WriteUpdate(&refDAC, samplePara[channel].refCh, ref);
+	return AD5724R_WriteUpdate(&refDAC[samplePara[channel].refChip],
+			samplePara[channel].refCh, ref);
 }
 
 
 HAL_StatusTypeDef SampleCtrl_UpdateAllRef()
 {
-	return DAC8568_UpdateAll(&refDAC);
+	HAL_StatusTypeDef st = HAL_OK;
+	for (uint8_t chip = 0; chip < REF_CHIP_NUM; ++chip) {
+		st = AD5724R_Update(&refDAC[chip]);
+		if (st != HAL_OK) {
+			return st;
+		}
+	}
+	return st;
 }
 
 HAL_StatusTypeDef SampleCtrl_SetAllRefAndUpdate(uint16_t refs[CHANNEL_NUM])
@@ -184,21 +226,29 @@ HAL_StatusTypeDef SampleCtrl_SetAllRefAndUpdate(uint16_t refs[CHANNEL_NUM])
 
 	for (sample_ch_t ch = SAMPLE_CH1; ch < CHANNEL_NUM; ++ch) {
 		samplePara[ch].ref = refs[ch];
-		st = DAC8568_WriteInputOnly(&refDAC, samplePara[ch].refCh, refs[ch]);
+		st = AD5724R_WriteInputOnly(&refDAC[samplePara[ch].refChip],
+				samplePara[ch].refCh, refs[ch]);
 		if (st != HAL_OK) {
 			return st;
 		}
 	}
 
-	return DAC8568_UpdateAll(&refDAC);
+	return SampleCtrl_UpdateAllRef();
 }
 
 HAL_StatusTypeDef SampleCtrl_SetAllSameRef(uint16_t ref)
 {
+	HAL_StatusTypeDef st = HAL_OK;
 	for (sample_ch_t ch = SAMPLE_CH1; ch < CHANNEL_NUM; ++ch) {
 		samplePara[ch].ref = ref;
 	}
-	return DAC8568_BroadcastWriteUpdate(&refDAC, ref);
+	for (uint8_t chip = 0; chip < REF_CHIP_NUM; ++chip) {
+		st = AD5724R_BroadcastWriteUpdate(&refDAC[chip], ref);
+		if (st != HAL_OK) {
+			return st;
+		}
+	}
+	return st;
 }
 
 
@@ -214,7 +264,8 @@ HAL_StatusTypeDef SampleCtrl_SetChGainRef(sample_ch_t channel, uint16_t gain, ui
 	if (st != HAL_OK) {
 		return st;
 	}
-	st = DAC8568_WriteInputOnly(&refDAC, samplePara[channel].refCh, ref);
+	st = AD5724R_WriteInputOnly(&refDAC[samplePara[channel].refChip],
+			samplePara[channel].refCh, ref);
 	return st;
 }
 
@@ -231,7 +282,8 @@ HAL_StatusTypeDef SampleCtrl_SetChGainRefAndUpdate(sample_ch_t channel, uint16_t
 	if (st != HAL_OK) {
 		return st;
 	}
-	st = DAC8568_WriteUpdate(&refDAC, samplePara[channel].refCh, ref);
+	st = AD5724R_WriteUpdate(&refDAC[samplePara[channel].refChip],
+			samplePara[channel].refCh, ref);
 	return st;
 }
 
@@ -257,7 +309,9 @@ void SampleCtrl_GetAll(uint16_t gains[CHANNEL_NUM], uint16_t refs[CHANNEL_NUM])
 static void resetGainRefs()
 {
 	DAC8568_BroadcastWriteUpdate(&gainDAC, GAIN_DEFAULT_VALUE);
-	DAC8568_BroadcastWriteUpdate(&refDAC, REF_DEFAULT_VALUE);
+	for (uint8_t chip = 0; chip < REF_CHIP_NUM; ++chip) {
+		AD5724R_BroadcastWriteUpdate(&refDAC[chip], REF_DEFAULT_VALUE);
+	}
 
 	for (sample_ch_t ch = SAMPLE_CH1; ch < CHANNEL_NUM; ++ch) {
 		samplePara[ch].gain = GAIN_DEFAULT_VALUE;
