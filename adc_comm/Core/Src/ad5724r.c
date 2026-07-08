@@ -115,7 +115,15 @@ HAL_StatusTypeDef AD5724R_Init(ad5724r_t *dev,
     if (st != HAL_OK) return st;
 
     // Allow the channels/reference to power up (datasheet: 10 us typical).
-    HAL_Delay(1);
+    // NOTE: must NOT use HAL_Delay() here. AD5724R_Init() runs from
+    // SampleCtrl_Init() BEFORE osKernelStart(); at that point the FreeRTOS/HAL
+    // tick (TIM2) is not yet incrementing uwTick, so HAL_Delay() never returns
+    // and the kernel never starts (symptom: all Modbus comms dead). Use a
+    // scheduler-independent busy-wait instead -- generous vs the ~10 us needed.
+    for (volatile uint32_t i = 0; i < 200000U; ++i) {
+        __NOP();
+    }
+
 
     return HAL_OK;
 }
