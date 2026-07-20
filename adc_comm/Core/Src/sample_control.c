@@ -97,7 +97,7 @@ HAL_StatusTypeDef SampleCtrl_Init()
 	}
 
 
-	st = DAC8568_Init(&gainDAC, &GAIN_CTRL_SPI, GAIN_CTRL_SYNC_GPIO, GAIN_CTRL_SYNC_PIN, false, 3.3);
+	st = DAC8568_Init(&gainDAC, &GAIN_CTRL_SPI, GAIN_CTRL_SYNC_GPIO, GAIN_CTRL_SYNC_PIN, false, 5.0);
 	if (st != HAL_OK) {
 		return st;
 	}
