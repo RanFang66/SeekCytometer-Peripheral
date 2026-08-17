@@ -17,8 +17,8 @@
 #define GAIN_CTRL_SPI	hspi1
 #define REF_CTRL_SPI	hspi1
 
-#define GAIN_CTRL_SYNC_GPIO		SYNC2_GPIO_Port
-#define GAIN_CTRL_SYNC_PIN		SYNC2_Pin
+#define GAIN_CTRL_SYNC_GPIO		SYNC1_GPIO_Port
+#define GAIN_CTRL_SYNC_PIN		SYNC1_Pin
 
 // Two AD5724R share hspi1 with the gain DAC8568; each has its own chip select.
 // ref_cs1 (PB0) drives channels 1-4, ref_cs2 (PB1) drives channels 5-8.
@@ -97,7 +97,7 @@ HAL_StatusTypeDef SampleCtrl_Init()
 	}
 
 
-	st = DAC8568_Init(&gainDAC, &GAIN_CTRL_SPI, GAIN_CTRL_SYNC_GPIO, GAIN_CTRL_SYNC_PIN, false, 5.0);
+	st = DAC8568_Init(&gainDAC, &GAIN_CTRL_SPI, GAIN_CTRL_SYNC_GPIO, GAIN_CTRL_SYNC_PIN, false, 3.3);
 	if (st != HAL_OK) {
 		return st;
 	}
