@@ -17,6 +17,9 @@
 #define CHURN_MOTOR_EN_GPIO			(GPIOE)
 #define CHURN_MOTOR_EN_PIN			(GPIO_PIN_6)
 
+/* DEPRECATED: the cover mechanism was removed by the hardware revision and the
+ * module is compiled out (see ENABLE_COVER_CTRL in cover_control.h), so nothing
+ * drives these pins - they stay at the reset level set by MX_GPIO_Init. */
 #define COVER_MOTOR_EN_GPIO			(GPIOC)
 #define COVER_MOTOR_EN_PIN			(GPIO_PIN_9)
 
@@ -27,11 +30,19 @@
 #define COVER_MOTOR_FG_PIN			(GPIO_PIN_12)
 
 
+// Seal motor H-bridge power enable (M1_Power)
 #define SEAL_MOTOR_EN_GPIO			(GPIOC)
 #define SEAL_MOTOR_EN_PIN			(GPIO_PIN_7)
 
-#define SEAL_MOTOR_DIR_GPIO			(GPIOA)
-#define SEAL_MOTOR_DIR_PIN			(GPIO_PIN_8)
+/* Seal motor H-bridge inputs. IN1 is the PWM side (TIM1 CH3, see bsp_tim.h);
+ * the GPIO entry below only exists so the pin level can be read back for
+ * diagnostics. IN2 is a plain output, MX_GPIO_Init configures it as M6_DIR_Pin
+ * (the pin the old seal driver used as its direction line). */
+#define SEAL_MOTOR_IN1_GPIO			(GPIOA)
+#define SEAL_MOTOR_IN1_PIN			(GPIO_PIN_10)
+
+#define SEAL_MOTOR_IN2_GPIO			(GPIOA)
+#define SEAL_MOTOR_IN2_PIN			(GPIO_PIN_8)
 
 #define SEAL_MOTOR_FG_GPIO			(GPIOA)
 #define SEAL_MOTOR_FG_PIN			(GPIO_PIN_9)

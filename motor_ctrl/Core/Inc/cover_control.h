@@ -8,6 +8,20 @@
 #ifndef INC_COVER_CONTROL_H_
 #define INC_COVER_CONTROL_H_
 
+/* The hardware revision removed the cover mechanism and re-assigned its
+ * direction pin (PA11) to the seal motor H-bridge IN2, so the cover module must
+ * stay off: it would fight the seal driver for that pin.
+ *
+ * Setting this to 1 re-enables the whole module (implementation, task, Modbus
+ * command dispatch and the "cover" shell command) - but PA11 has to be sorted
+ * out first, see SEAL_MOTOR_IN2_* in bsp_gpio.h.
+ *
+ * The types and prototypes below stay visible on purpose: a call site that is
+ * missed by the guards then fails at link time instead of silently building. */
+#ifndef ENABLE_COVER_CTRL
+#define ENABLE_COVER_CTRL	0
+#endif
+
 #include "dc_motor.h"
 
 typedef enum {

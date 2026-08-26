@@ -12,6 +12,12 @@
 #include "cmsis_os2.h"
 #include "debug_shell.h"
 
+/* Cover mechanism removed by the hardware revision - the whole implementation is
+ * compiled out, see ENABLE_COVER_CTRL in cover_control.h. Note that it still
+ * refers to COVER_MOTOR_DIR_* (PA11), which bsp_gpio.h no longer defines because
+ * that pin now drives the seal H-bridge IN2. */
+#if ENABLE_COVER_CTRL
+
 static DCMotor_t 			coverMotor;
 static const PosSensor_t	pClosed = {.gpio=COVER_CLOSED_GPIO, .pin=COVER_CLOSED_PIN};
 static const PosSensor_t	pAlmostClosed = {.gpio=COVER_ALMOST_CLOSED_GPIO, .pin=COVER_ALMOST_CLOSED_PIN};
@@ -238,4 +244,6 @@ void Cover_SetDescSpeed(uint16_t vel)
 {
 	coverCtrl.descVel = vel;
 }
+
+#endif /* ENABLE_COVER_CTRL */
 

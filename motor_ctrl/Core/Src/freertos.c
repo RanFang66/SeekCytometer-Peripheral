@@ -127,7 +127,9 @@ void MX_FREERTOS_Init(void) {
   TempCtrl_StartTask();
   SMotorCtrl_StartTask();
 
+#if ENABLE_COVER_CTRL
   CoverControl_StartTask();
+#endif
   SealCtrl_StartTask();
   ChurnCtrl_StartTask();
   ChurnDcCtrl_StartTask();

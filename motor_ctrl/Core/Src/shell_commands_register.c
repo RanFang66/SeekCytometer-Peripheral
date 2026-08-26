@@ -18,6 +18,7 @@
 #include "laser_control.h"
 #include "led_control.h"
 
+#if ENABLE_COVER_CTRL
 static const char coverCmdHelp[] = "Control cover(open, close), Use cover -o/c/s/i/...";
 static const char *coverPosStr[] = {"Closed", "Almost Closed", "Middle", "Almost Opened", "Opened", "Undefined"};
 static const char *coverStatusStr[] = {"IDLE", "OPENING", "CLOSING", "FAULT"};
@@ -81,8 +82,9 @@ static void CoverControlCommand(int argc, char *argv[])
 }
 
 static DebugCommand_t coverCmd = {"cover", coverCmdHelp, CoverControlCommand};
+#endif /* ENABLE_COVER_CTRL */
 
-static const char sealCmdHelp[]  = "Control seal(push, release), Use seal -p/r/s/i/...";
+static const char sealCmdHelp[]  = "Control seal(push, release), Use seal -p/r/s/i/... , raw H-bridge: seal -d <in1duty 0~10000> <in2 0/1>";
 static const char *sealStatusStr[] = {"IDLE", "PUSHING", "PUSHED", "RELEASING", "RELEASED","FAULT"};
 extern uint16_t getMaxI();
 static void SealControlCommand(int argc, char *argv[])
@@ -121,6 +123,23 @@ static void SealControlCommand(int argc, char *argv[])
 	case 'i':
 		Shell_Print("\r\n Seal Status: %s, Seal Motor Current: %d, Sensor IO: %d, maxI: %d",
 				sealStatusStr[SealCtrl_GetStatus()], GetMotorCurrentAdc(), SealCtrl_SealPushed(), getMaxI());
+		Shell_Print("\r\n H-bridge: IN1(PA10) CCR=%d level=%d, IN2(PA8) level=%d, PWR(PC7)=%d",
+				SealCtrl_GetIn1Compare(), SealCtrl_GetIn1Level(),
+				SealCtrl_GetIn2Level(), SealCtrl_GetPowerLevel());
+		break;
+
+	/* Raw H-bridge drive for bench bring-up: seal -d <in1 duty 0~10000> <in2 0/1> */
+	case 'd':
+	case 'D':
+		if (argc < 4) {
+			Shell_Print("\r\n>> Use seal -d <in1duty 0~10000> <in2 0/1>");
+			return;
+		}
+		val = atoi(argv[2]);
+		SealCtrl_RawDrive(val, (uint8_t)atoi(argv[3]));
+		Shell_Print("\r\n Raw drive: IN1 duty=%d -> CCR=%d, IN2=%d (%s)",
+				val, SealCtrl_GetIn1Compare(), SealCtrl_GetIn2Level(),
+				(atoi(argv[3]) != 0) ? "reverse/slow decay" : "forward/fast decay");
 		break;
 
 
@@ -130,6 +149,7 @@ static void SealControlCommand(int argc, char *argv[])
 				SealCtrl_GetPushSpeed(), SealCtrl_GetReleaseSpeed(),
 				SealCtrl_GetPushTimeLimit(), SealCtrl_GetReleaseTimeLimit(),
 				SealCtrl_GetFaultCurrThresh(), SealCtrl_GetPushedCurrThresh());
+		Shell_Print("\r\n Extra push time after sensor: %d ms", SealCtrl_GetPushExtraTime());
 		break;
 
 	case 'v':
@@ -153,7 +173,7 @@ static void SealControlCommand(int argc, char *argv[])
 	case 't':
 	case 'T':
 		if (argc < 4) {
-			Shell_Print("\r\n>> Use seal -t <p/r> <val>");
+			Shell_Print("\r\n>> Use seal -t <p/r/e> <val>");
 			return;
 		}
 
@@ -162,8 +182,10 @@ static void SealControlCommand(int argc, char *argv[])
 			SealCtrl_SetPushTimeLimit(val);
 		} else if (argv[2][0] == 'r') {
 			SealCtrl_SetReleaseTimeLimit(val);
+		} else if (argv[2][0] == 'e') {
+			SealCtrl_SetPushExtraTime(val);
 		} else {
-			Shell_Print("\r\n>> Use seal -t <p/r> <val>");
+			Shell_Print("\r\n>> Use seal -t <p/r/e> <val>");
 			return;
 		}
 		break;
@@ -678,12 +700,14 @@ static DebugCommand_t LEDCtrlCmd = {"led", ledCmdHelp, LEDControlCommand};
 void registerDebugCommands(void)
 {
 	bool ret;
+#if ENABLE_COVER_CTRL
 	ret = Shell_RegisterCommand(&coverCmd);
 	if (ret) {
 		LOG_INFO("Register cover command OK");
 	} else {
 		LOG_WARNING("Register cover command FAILED");
 	}
+#endif
 
 	ret = Shell_RegisterCommand(&sealCmd);
 	if (ret) {

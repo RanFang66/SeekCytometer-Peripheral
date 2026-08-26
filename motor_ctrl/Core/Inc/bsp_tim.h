@@ -21,12 +21,24 @@
 
 
 // cover motor: TIM2 CH1
+// DEPRECATED: cover mechanism removed by hardware revision, see ENABLE_COVER_CTRL
 #define COVER_MOTOR_TIM 	(htim2)
 #define COVER_MOTOR_PWM_CH	(TIM_CHANNEL_1)
 
-// seal motor: TIM1 CH3
-#define SEAL_MOTOR_TIM		(htim1)
-#define SEAL_MOTOR_PWM_CH	(TIM_CHANNEL_3)
+// seal motor H-bridge IN1 (PWM input): TIM1 CH3 -> PA10
+#define SEAL_MOTOR_IN1_TIM		(htim1)
+#define SEAL_MOTOR_IN1_PWM_CH	(TIM_CHANNEL_3)
+
+// Full scale of the IN1 duty cycle == htim1.Init.Period + 1 (MX_TIM1_Init: Period = 9999)
+#define SEAL_MOTOR_PWM_MAX		(10000)
+
+/* tim.c configures TIM1 CH3 as PWM1 with TIM_OCPOLARITY_LOW, i.e. the compare
+ * value counts the time PA10 stays LOW:
+ *     IN1 high duty = (SEAL_MOTOR_PWM_MAX - CCR) / SEAL_MOTOR_PWM_MAX
+ * The H-bridge however drives forward on IN1 = 1, so seal_control.c compensates
+ * for that inversion. Set this to 0 if tim.c is ever regenerated with
+ * TIM_OCPOLARITY_HIGH - no other code needs to change. */
+#define SEAL_MOTOR_PWM_ACTIVE_LOW	(1)
 
 
 // Cooler: cooler 1: TIM12 CH2 cooler 2: TIM12 CH1

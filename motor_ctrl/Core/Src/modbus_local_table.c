@@ -141,9 +141,15 @@ void MB_Local_RegInit(void)
 
 void MB_UpdateStatus(void)
 {
+#if ENABLE_COVER_CTRL
 	CoverStatus_t status = Cover_GetStatus();
 	CoverPos_t  pos = Cover_GetPos();
 	coverStatus = (uint16_t)status | ((uint16_t)pos << 8);
+#else
+	// Cover removed by hardware revision: report a fixed idle/unknown status so
+	// the HMI keeps reading the register without an exception.
+	coverStatus = (uint16_t)COVER_IDLE | ((uint16_t)COVER_POS_UNDEFINED << 8);
+#endif
 
 	sealStatus = SealCtrl_GetStatus();
 
@@ -193,6 +199,7 @@ void MB_CommandParse(void)
 	if (ctrlWord.word == lastCtrlWord.word) {
 		return; 		// No commands
 	}
+#if ENABLE_COVER_CTRL
 	if (ctrlWord.bits.coverCtrl && !lastCtrlWord.bits.coverCtrl) {
 		switch (coverCmd) {
 		case COVER_CMD_STOP:
@@ -208,6 +215,7 @@ void MB_CommandParse(void)
 			break;
 		}
 	}
+#endif
 
 	if (ctrlWord.bits.sealCtrl && !lastCtrlWord.bits.sealCtrl) {
 		switch (sealCmd) {

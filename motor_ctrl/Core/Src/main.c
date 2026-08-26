@@ -122,7 +122,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
   Shell_Init();
   BSP_StartAdcConvertContinuous();
+#if ENABLE_COVER_CTRL
   CoverControl_Init();
+#endif
   SealCtrl_Init();
   ChurnCtrl_Init();
   MX_TIM7_Init();
