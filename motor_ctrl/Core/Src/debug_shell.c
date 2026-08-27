@@ -324,3 +324,22 @@ static void HelpCommand(int argc, char *argv[])
         Shell_Print("  %-10s : %s", registeredCommands[i].name, registeredCommands[i].help);
     }
 }
+
+/**
+  * @brief Shell UART error handler.
+  * Must be called from HAL_UART_ErrorCallback() for the shell UART.
+  *
+  * The shell lives on a single-byte HAL_UART_Receive_IT that is only re-armed
+  * from the RX-complete callback, so a line error would otherwise leave it deaf
+  * for good - and the shell is the only way to look at the board when the
+  * Modbus link is down.
+  */
+void Shell_UartErrorCallBack(UART_HandleTypeDef *huart)
+{
+    if (shellUartHandle == NULL || huart->Instance != shellUartHandle->Instance) {
+        return;
+    }
+    __HAL_UART_CLEAR_PEFLAG(huart);
+    huart->ErrorCode = HAL_UART_ERROR_NONE;
+    HAL_UART_Receive_IT(shellUartHandle, &rxSingleByte, 1);
+}

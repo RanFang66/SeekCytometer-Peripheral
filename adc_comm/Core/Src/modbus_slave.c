@@ -21,6 +21,21 @@ extern MB_MasterCtx_t mbPZT;
 extern MB_MasterCtx_t *getMBMasterCtx(target_t target); // Forward declaration
 
 static MB_SlaveCtx_t mbSlave;
+/* --- Slave link diagnostics -------------------------------------------------
+ * A UART line error aborts the RX DMA inside HAL (UART_EndRxTransfer), and
+ * nothing used to re-arm it: one glitch killed reception permanently. These
+ * counters, MB_SLAVE_UART_HandleError() and the task watchdog below make that
+ * self-healing and let "mb -i" say what actually happened.
+ * -------------------------------------------------------------------------*/
+static volatile uint32_t mbSlaveValidCount = 0;	/* frames that passed addr/CRC/range */
+static volatile uint32_t mbSlaveErrCount  = 0;	/* HAL error callbacks seen */
+static volatile uint32_t mbSlaveErrCode   = 0;	/* OR of every HAL_UART_ERROR_* bit */
+static volatile uint32_t mbSlaveRearmFail = 0;	/* re-arm refused inside the ISR */
+static volatile uint32_t mbSlaveWdRearm   = 0;	/* re-arms done by the task watchdog */
+
+/* Nothing received for this long -> make sure reception is still armed. */
+#define MB_SLAVE_RX_WD_MS	(1000U)
+
 
 /* Thread flag used to signal the slave task that a DMA response transfer
  * has fully completed (set from HAL_UART_TxCpltCallback). */
@@ -180,7 +195,7 @@ static void MB_Slave_Task(void *argument)
 
 	while (1) {
 		// Wait for a new frame from the UART RX callback
-		if (osMessageQueueGet(mbSlave.rxQueue, &msg, NULL, osWaitForever) == osOK) {
+		if (osMessageQueueGet(mbSlave.rxQueue, &msg, NULL, MB_SLAVE_RX_WD_MS) == osOK) {
 			processCount++;
 			const uint8_t *rxFrame = msg.frame;
 			uint16_t rxLen = msg.length;
@@ -222,6 +237,7 @@ static void MB_Slave_Task(void *argument)
 
 			// 3. Determine Target (Local or Remote)
 			target_t target = get_target_from_addr(startAddr, quantity);
+			mbSlaveValidCount++;
 
 			if (target == TARGET_INVALID) {
 			    SendException(&mbSlave, fc, MB_EX_ILLEGAL_DATA_ADDR);
@@ -331,6 +347,18 @@ static void MB_Slave_Task(void *argument)
 			        SendException(&mbSlave, fc, ex_code);
 			    }
 			}
+		} else {
+			/* Watchdog: nothing arrived for a while. When reception is healthy
+			 * RxState is BUSY_RX and this does nothing; if an error path (or a
+			 * re-arm that lost the handle lock) left it disarmed, restart it. */
+			if (mbSlave.huart != NULL &&
+				mbSlave.huart->RxState != HAL_UART_STATE_BUSY_RX) {
+				mbSlaveWdRearm++;
+				__HAL_UART_CLEAR_PEFLAG(mbSlave.huart);
+				mbSlave.huart->ErrorCode = HAL_UART_ERROR_NONE;
+				HAL_UARTEx_ReceiveToIdle_DMA(mbSlave.huart, mbSlave.rxDMABuffer,
+											 MB_SLAVE_RX_BUFFER_SIZE);
+			}
 		}
 	}
 }
@@ -432,4 +460,60 @@ void MB_SLAVE_UART_HandleTxCplt(UART_HandleTypeDef *huart)
 	if (huart->Instance == mbSlave.huart->Instance && mbSlave.taskHandle != NULL) {
 		osThreadFlagsSet(mbSlave.taskHandle, MB_SLAVE_TXCPLT_FLAG);
 	}
+}
+
+
+/**
+ * @brief UART error handler for the Slave link.
+ * Must be called from HAL_UART_ErrorCallback() for the slave UART.
+ *
+ * On PE/FE/NE/ORE the HAL aborts the RX DMA and leaves RxState READY, so the
+ * reception has to be started again here or the link stays deaf forever.
+ */
+void MB_SLAVE_UART_HandleError(UART_HandleTypeDef *huart)
+{
+	if (mbSlave.huart == NULL || huart->Instance != mbSlave.huart->Instance) {
+		return;
+	}
+
+	mbSlaveErrCount++;
+	mbSlaveErrCode |= huart->ErrorCode;
+
+	/* Clear the sticky PE/FE/NE/ORE flags (SR read + DR read) so the freshly
+	 * re-armed reception does not trip the same error again immediately. */
+	__HAL_UART_CLEAR_PEFLAG(huart);
+	huart->ErrorCode = HAL_UART_ERROR_NONE;
+
+	/* Can still be refused with HAL_BUSY when the handle lock is held by a
+	 * response TX in flight - the task watchdog picks that case up. */
+	if (HAL_UARTEx_ReceiveToIdle_DMA(huart, mbSlave.rxDMABuffer,
+									 MB_SLAVE_RX_BUFFER_SIZE) != HAL_OK) {
+		mbSlaveRearmFail++;
+	}
+}
+
+void MB_Slave_GetDiag(MB_SlaveDiag_t *diag)
+{
+	if (diag == NULL) {
+		return;
+	}
+	diag->rxEvtCount   = itCount;
+	diag->processCount = processCount;
+	diag->validCount   = mbSlaveValidCount;
+	diag->errCount     = mbSlaveErrCount;
+	diag->errCode      = mbSlaveErrCode;
+	diag->rearmFail    = mbSlaveRearmFail;
+	diag->wdRearm      = mbSlaveWdRearm;
+	diag->rxState      = (mbSlave.huart != NULL) ? (uint8_t)mbSlave.huart->RxState : 0;
+}
+
+void MB_Slave_ClearDiag(void)
+{
+	itCount = 0;
+	processCount = 0;
+	mbSlaveValidCount = 0;
+	mbSlaveErrCount = 0;
+	mbSlaveErrCode = 0;
+	mbSlaveRearmFail = 0;
+	mbSlaveWdRearm = 0;
 }

@@ -25,6 +25,7 @@ static Peltier_t peltier_2 = {
 		.pwmChannel = COOLER_2_PWM_CH,
 		.pwmVal = 0,
 		.status = 0,
+		.phaseB = TEMP_PELTIER_INTERLEAVE,	// switches on the opposite half of the period
 };
 
 static Fan_t fan_1 = {
@@ -63,10 +64,50 @@ static osMessageQueueId_t 	tempCtrlCmdQueue = NULL;
 static osThreadId_t 		tempCtrlThread = NULL;
 
 
+/* Timer clock feeding TIM12. On APB1 the timer clock is PCLK1 doubled whenever
+ * the APB1 prescaler is not 1 (RM0090 clock tree) - 84 MHz with this board's
+ * HCLK/4 setting. Read it from RCC instead of hard-coding, so a clock-tree change
+ * in CubeMX cannot silently shift the PWM frequency. */
+static uint32_t Peltier_TimerClk(void)
+{
+	uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
+	return ((RCC->CFGR & RCC_CFGR_PPRE1) == 0U) ? pclk1 : (pclk1 * 2U);
+}
+
+/* PWM mode 1 is active while CNT < CCR (ON window at the start of the period),
+ * PWM mode 2 while CNT >= CCR (ON window at the end). So a phase-B channel needs
+ * the complementary compare value to end up with the same duty. Note that a duty
+ * of 0 maps to CCR = 0 in mode 1 and CCR = TEMP_PWM_MAX (> ARR) in mode 2, both
+ * of which are permanently inactive - and duty = TEMP_PWM_MAX is the reverse. */
+static inline uint32_t Peltier_DutyToCompare(const Peltier_t *p, uint16_t duty)
+{
+	return p->phaseB ? (uint32_t)(TEMP_PWM_MAX - duty) : (uint32_t)duty;
+}
+
 void Peltier_SetPwmOutput(Peltier_t *p, uint16_t value)
 {
-	__HAL_TIM_SET_COMPARE(p->htim, p->pwmChannel, value);
+	if (value > TEMP_PWM_MAX) {
+		value = TEMP_PWM_MAX;
+	}
+	__HAL_TIM_SET_COMPARE(p->htim, p->pwmChannel, Peltier_DutyToCompare(p, value));
 	p->pwmVal = value;
+}
+
+/* Puts the channel into its PWM mode and leaves it at 0% duty. Must run before
+ * HAL_TIM_PWM_Start(); TIM12 is untouched in tim.c, this only rewrites the OCxM
+ * bits of the channel through the normal HAL path so a CubeMX regeneration of
+ * tim.c cannot undo it. */
+static void Peltier_ConfigChannel(Peltier_t *p)
+{
+	TIM_OC_InitTypeDef oc = {0};
+	oc.OCMode = p->phaseB ? TIM_OCMODE_PWM2 : TIM_OCMODE_PWM1;
+	oc.Pulse = Peltier_DutyToCompare(p, 0);
+	oc.OCPolarity = TIM_OCPOLARITY_HIGH;
+	oc.OCFastMode = TIM_OCFAST_DISABLE;
+	if (HAL_TIM_PWM_ConfigChannel(p->htim, &oc, p->pwmChannel) != HAL_OK) {
+		LOG_ERROR("Config peltier PWM channel FAILED!");
+	}
+	p->pwmVal = 0;
 }
 
 void Peltier_Enable(Peltier_t *p)
@@ -78,7 +119,7 @@ void Peltier_Enable(Peltier_t *p)
 void Peltier_Disable(Peltier_t *p)
 {
 	HAL_TIM_PWM_Stop(p->htim, p->pwmChannel);
-	__HAL_TIM_SET_COMPARE(p->htim, p->pwmChannel, 0);
+	__HAL_TIM_SET_COMPARE(p->htim, p->pwmChannel, Peltier_DutyToCompare(p, 0));
 	p->pwmVal = 0;
 	p->status = 0;
 }
@@ -128,6 +169,67 @@ void TempCtrl_Init()
 	tempCtrl.temp_target = DEFAULT_TEMP_TARGET;
 	tempCtrl.peltier_enable[0] = 1;
 	tempCtrl.peltier_enable[1] = 1;
+
+	/* Set the PWM modes (this is what interleaves the two peltiers) and the
+	 * carrier frequency before anything starts driving them. */
+	for (uint8_t i = 0; i < PELTIER_NUM; i++) {
+		Peltier_ConfigChannel(tempCtrl.peltier[i]);
+	}
+	TempCtrl_SetPwmFreq(DEFAULT_PWM_FREQ_HZ);
+}
+
+
+uint32_t TempCtrl_SetPwmFreq(uint32_t hz)
+{
+	uint32_t timClk = Peltier_TimerClk();
+	uint32_t maxHz = timClk / TEMP_PWM_MAX;
+
+	if (hz > maxHz)          hz = maxHz;
+	if (hz < MIN_PWM_FREQ_HZ) hz = MIN_PWM_FREQ_HZ;
+
+	/* PSC+1 rounded to the nearest, so "temp -w 1000" lands as close as the
+	 * divider allows instead of always rounding down. */
+	uint32_t div = (timClk + (hz * TEMP_PWM_MAX) / 2U) / (hz * TEMP_PWM_MAX);
+	if (div < 1U)      div = 1U;
+	if (div > 0x10000U) div = 0x10000U;
+
+	/* Both peltiers share TIM12, so one prescaler write covers both. It latches
+	 * at the next update event; the compare values keep their meaning because the
+	 * period (ARR) is unchanged, so the duty does not glitch. */
+	__HAL_TIM_SET_PRESCALER(&COOLER_1_TIM, div - 1U);
+	COOLER_1_TIM.Init.Prescaler = div - 1U;
+
+	return timClk / div / TEMP_PWM_MAX;
+}
+
+
+uint32_t TempCtrl_GetPwmFreq(void)
+{
+	uint32_t div = (uint32_t)COOLER_1_TIM.Instance->PSC + 1U;
+	return Peltier_TimerClk() / div / TEMP_PWM_MAX;
+}
+
+
+void TempCtrl_RawPwm(uint16_t percent)
+{
+	if (percent > 100U) {
+		percent = 100U;
+	}
+
+	/* Take the loop out of RUNNING first so TempCtrl_Task() stops writing the
+	 * compare registers, then drive both peltiers directly. Same shape as
+	 * SealCtrl_RawDrive(). A FAULT is left alone - clear it with "temp -r". */
+	if (tempCtrl.status == TEMP_CTRL_RUNNING) {
+		tempCtrl.status = TEMP_CTRL_IDLE;
+	}
+
+	uint16_t duty = (uint16_t)(((uint32_t)percent * TEMP_PWM_MAX) / 100U);
+	for (uint8_t i = 0; i < PELTIER_NUM; i++) {
+		if (tempCtrl.peltier_enable[i]) {
+			Peltier_Enable(tempCtrl.peltier[i]);
+			Peltier_SetPwmOutput(tempCtrl.peltier[i], duty);
+		}
+	}
 }
 
 
@@ -229,7 +331,7 @@ float TempCtrl_GetTempTarget()
 float TempCtrl_GetTemp(int index)
 {
 	if (index < 0 || index >= TEMPERATURE_NTC_NUM) {
-		return index = 0;
+		return 0.0f;
 	}
 	return tempCtrl.temp_measured[index];
 }
@@ -245,6 +347,41 @@ float TempCtrl_GetKp()
 float TempCtrl_GetKi()
 {
 	return tempCtrl.pid->Ki;
+}
+
+float TempCtrl_GetKd()
+{
+	return tempCtrl.pid->Kd;
+}
+
+float TempCtrl_GetFfCoee()
+{
+	return tempCtrl.pid->feedforwardCoee;
+}
+
+uint16_t TempCtrl_GetOutput()
+{
+	return (uint16_t)tempCtrl.pid->prev_output;
+}
+
+void TempCtrl_GetPidDebug(float *dP, float *dI, float *dD, float *ff)
+{
+	if (dP) *dP = tempCtrl.pid->dbg_dP;
+	if (dI) *dI = tempCtrl.pid->dbg_dI;
+	if (dD) *dD = tempCtrl.pid->dbg_dD;
+	if (ff) *ff = tempCtrl.pid->dbg_ff;
+}
+
+/* Gains, not controller state - written straight into the handle instead of
+ * going through the command queue, same as the getters above read it. */
+void TempCtrl_SetTunings(float kp, float ki, float kd)
+{
+	PID_SetTunings(tempCtrl.pid, kp, ki, kd, tempCtrl.pid->tau, tempCtrl.pid->feedforwardCoee);
+}
+
+void TempCtrl_SetFeedforwardCoee(float coee)
+{
+	tempCtrl.pid->feedforwardCoee = coee;
 }
 
 uint8_t TempCtrl_GetFanStatus(uint8_t id)
@@ -279,6 +416,15 @@ void TempCtrl_Reset()
 }
 
 
+
+/* Steady-state duty needed to hold the target against the ambient heat leak.
+ * Computed here, in the real temperature domain, so the PID never has to deal
+ * with the sign convention used at the call site below. */
+static float TempCtrl_Feedforward(void)
+{
+	float delta = DEFAULT_AMBIENT_TEMP - tempCtrl.temp_target;
+	return (delta > 0.0f) ? (tempCtrl.pid->feedforwardCoee * delta) : 0.0f;
+}
 
 static void UpdateTempCtrlOutput(uint16_t output)
 {
@@ -341,6 +487,37 @@ static void CoolFanSetting(uint8_t fanEnCh, uint16_t fanSpeed[COOL_FAN_NUM])
 		} else {
 			Fan_Disable(tempCtrl.fan[i]);
 		}
+	}
+}
+
+
+/* Trip the peltiers if the heat sink runs away (fans off, blocked airflow...).
+ * Without this the symptom is indistinguishable from a controller problem: the
+ * output sits at full scale and the chamber refuses to cool. */
+static void TempCtrl_CheckSink(uint32_t now)
+{
+	static uint32_t lastWarnTick = 0;
+	float sink1 = tempCtrl.temp_measured[TEMPERATURE_SINK_1_INDEX];
+	float sink2 = tempCtrl.temp_measured[TEMPERATURE_SINK_2_INDEX];
+	float sink = (sink1 > sink2) ? sink1 : sink2;
+
+	if (tempCtrl.status != TEMP_CTRL_RUNNING) {
+		return;
+	}
+
+	if (sink >= SINK_TEMP_FAULT) {
+		StopTempCtrl();
+		tempCtrl.status = TEMP_CTRL_FAULT;
+		LOG_ERROR("Heat sink over temperature: %d.%d degC, temperature control STOPPED",
+				(int)sink, ((int)(sink * 10)) % 10);
+	} else if (sink >= SINK_TEMP_WARN) {
+		if (lastWarnTick == 0 || (now - lastWarnTick) >= SINK_WARN_PERIOD_MS) {
+			lastWarnTick = now;
+			LOG_WARNING("Heat sink hot: %d.%d degC, check the cooling fans",
+					(int)sink, ((int)(sink * 10)) % 10);
+		}
+	} else {
+		lastWarnTick = 0;
 	}
 }
 
@@ -420,22 +597,37 @@ static void TempCtrl_Task(void *arg)
 //			tempCtrl.status = TEMP_CTRL_FAULT;
 //		}
 
-		// Update delta t
 		uint32_t now = osKernelGetTickCount();
-		float dt = ((float)(now - last_tick)) / (float)osKernelGetTickFreq();
-		if (dt <= 0.0f) dt = 0.001f;
-		last_tick = now;
 
-		if (tempCtrl.status == TEMP_CTRL_RUNNING) {
-			// Calculate PID output
-			float environmentTemp = 25.0; // default environment temperature, todo: get real ambient temperature
-			float out = PID_Compute(tempCtrl.pid, -tempCtrl.temp_target, -tempCtrl.temp_measured[TEMPERATURE_AIR_INDEX], 25.0, dt);
+		// Heat sink protection runs at the task rate, not the PID rate
+		TempCtrl_CheckSink(now);
+
+		// The PID runs slower than the task, see TEMP_CTRL_PID_PERIOD_MS
+		if (tempCtrl.status == TEMP_CTRL_RUNNING &&
+			(now - last_tick) >= TEMP_CTRL_PID_PERIOD_MS) {
+			float dt = ((float)(now - last_tick)) / (float)osKernelGetTickFreq();
+			last_tick = now;
+			if (dt <= 0.0f) dt = 0.001f;
+
+			/* The plant is reverse acting - more output means a lower chamber
+			 * temperature - so both the setpoint and the feedback are negated to
+			 * turn it into a normal direct-acting loop for the PID. The
+			 * feed-forward is computed separately, in the real temperature
+			 * domain, and is unaffected by this. */
+			float out = PID_Compute(tempCtrl.pid,
+									-tempCtrl.temp_target,
+									-tempCtrl.temp_measured[TEMPERATURE_AIR_INDEX],
+									TempCtrl_Feedforward(),
+									dt);
 
 			// Update control output
 			UpdateTempCtrlOutput((uint16_t)out);
+		} else if (tempCtrl.status != TEMP_CTRL_RUNNING) {
+			// Keep the reference fresh so the first dt after a start is one period
+			last_tick = now;
 		}
 
-		osDelay(200);
+		osDelay(400);
 	}
 }
 

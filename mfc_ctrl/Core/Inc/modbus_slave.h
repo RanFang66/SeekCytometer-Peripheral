@@ -39,6 +39,18 @@ typedef struct {
 } MB_SlaveCtx_t;
 
 
+/* Slave link health, filled by MB_Slave_GetDiag() for the "mb -i" shell command */
+typedef struct {
+	uint32_t rxEvtCount;	/* UART RX-event callbacks */
+	uint32_t processCount;	/* frames handed to the task */
+	uint32_t validCount;	/* frames that passed addr/CRC/range checks */
+	uint32_t errCount;	/* UART error callbacks */
+	uint32_t errCode;	/* OR of HAL_UART_ERROR_* : PE 0x01 NE 0x02 FE 0x04 ORE 0x08 */
+	uint32_t rearmFail;	/* RX re-arm refused inside the error ISR */
+	uint32_t wdRearm;	/* RX re-armed by the task watchdog */
+	uint8_t  rxState;	/* huart->RxState, 0x22 = HAL_UART_STATE_BUSY_RX */
+} MB_SlaveDiag_t;
+
 void MB_Slave_Init();
 void MB_Slave_StartTask(void);
 
@@ -50,6 +62,14 @@ void MB_SLAVE_UART_HandleRxEvent(UART_HandleTypeDef *huart, uint16_t size);
 
 // Must be called from HAL_UART_TxCpltCallback() for the slave UART
 void MB_SLAVE_UART_HandleTxCplt(UART_HandleTypeDef *huart);
+
+// Must be called from HAL_UART_ErrorCallback() for the slave UART. Re-arms the
+// RX DMA that the HAL aborts on a line error - without it one glitch is fatal.
+void MB_SLAVE_UART_HandleError(UART_HandleTypeDef *huart);
+
+void MB_Slave_GetDiag(MB_SlaveDiag_t *diag);
+void MB_Slave_ClearDiag(void);
+
 
 
 

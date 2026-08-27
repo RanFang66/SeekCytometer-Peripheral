@@ -6,6 +6,8 @@
  */
 
 #include "debug_shell.h"
+#include "modbus_master.h"
+#include "modbus_slave.h"
 #include <stdlib.h>
 
 #include "cover_control.h"
@@ -320,7 +322,7 @@ static DebugCommand_t churnDcCmd = {"churndc", churnDcCmdHelp, ChurnDcControlCom
 
 
 
-static const char tempCmdHelp[] = "Control temperature， Use temp -e/s/r/i/t...";
+static const char tempCmdHelp[] = "Control temperature, Use temp -e/s/r/i/I/t/k/f/p/w ...";
 static const char *tempStatusStr[] = {"IDLE", "RUNNING", "FAULT"};
 
 static void TempControlCommand(int argc, char *argv[])
@@ -342,7 +344,7 @@ static void TempControlCommand(int argc, char *argv[])
 		case 'e':
 		case 'E':
 			if (argc < 3) {
-				Shell_Print("\r\n>> Use: temp -e <target>");
+				Shell_Print("\r\n>> Use: temp -e <target*10>");
 				return;
 			}
 			val = atoi(argv[2]);
@@ -365,25 +367,97 @@ static void TempControlCommand(int argc, char *argv[])
 					tempStatusStr[TempCtrl_GetStatus()], (int)(TempCtrl_GetTempTarget()*10), (int)(TempCtrl_GetTemp(TEMPERATURE_AIR_INDEX)*10),
 					(int)(TempCtrl_GetTemp(TEMPERATURE_SINK_1_INDEX)*10), (int)(TempCtrl_GetTemp(TEMPERATURE_SINK_2_INDEX)*10),(int)(TempCtrl_GetTemp(TEMPERATURE_OUTPUT_INDEX)*10));
 			break;
-		case 'I':
-			Shell_Print("TempCtrl Status: %s, Target: %d, Air: %d, Kp: %d, Ki: %d",
+		case 'I': {
+			/* Temperatures are printed x10; gains and PID terms x10 as well, so the
+			 * same scaling used by "temp -k"/"temp -f" reads back directly. Split
+			 * over two lines - SHELL_PRINT_BUFFER_SIZE is only 256 bytes. */
+			float dP = 0, dI = 0, dD = 0, ff = 0;
+			TempCtrl_GetPidDebug(&dP, &dI, &dD, &ff);
+			Shell_Print("TempCtrl Status: %s, Target: %d, Air: %d, Sink1: %d, Sink2: %d, Out: %d",
 						tempStatusStr[TempCtrl_GetStatus()], (int)(TempCtrl_GetTempTarget()*10),
 						(int)(TempCtrl_GetTemp(TEMPERATURE_AIR_INDEX)*10),
 						(int)(TempCtrl_GetTemp(TEMPERATURE_SINK_1_INDEX)*10),
 						(int)(TempCtrl_GetTemp(TEMPERATURE_SINK_2_INDEX)*10),
-						(int)(TempCtrl_GetTemp(TEMPERATURE_OUTPUT_INDEX)*10),
-						(int)(TempCtrl_GetKp()*100), (int)(TempCtrl_GetKi()*100));
+						(int)TempCtrl_GetOutput());
+			Shell_Print("\r\n   PID Kp: %d, Ki: %d, Kd: %d, FFcoee: %d | dP: %d, dI: %d, dD: %d, ff: %d",
+						(int)(TempCtrl_GetKp()*10), (int)(TempCtrl_GetKi()*10),
+						(int)(TempCtrl_GetKd()*10), (int)(TempCtrl_GetFfCoee()*10),
+						(int)dP, (int)dI, (int)dD, (int)ff);
+			Shell_Print("\r\n   PWM %lu Hz, peltier out: %d / %d (interleaved: %s)",
+						(unsigned long)TempCtrl_GetPwmFreq(),
+						TempCtrl_GetPeltierOutput(0), TempCtrl_GetPeltierOutput(1),
+						TEMP_PELTIER_INTERLEAVE ? "yes" : "no");
 			break;
+		}
 		case 't':
 		case 'T':
 			if (argc < 3) {
-				Shell_Print("\r\n>> Use temp -t <target>");
+				Shell_Print("\r\n>> Use temp -t <target*10>");
 				return;
 			}
 			val = atoi(argv[2]);
 			target = (float)val / 10.0;
 			TempCtrl_SetTarget(target);
 			break;
+
+		case 'k':
+		case 'K': {
+			/* Kp reaches the thousands, so this cannot reuse the uint16_t val */
+			if (argc < 5) {
+				Shell_Print("\r\n>> Use temp -k <kp*10> <ki*10> <kd*10>");
+				return;
+			}
+			int32_t kp = atoi(argv[2]);
+			int32_t ki = atoi(argv[3]);
+			int32_t kd = atoi(argv[4]);
+			TempCtrl_SetTunings((float)kp / 10.0f, (float)ki / 10.0f, (float)kd / 10.0f);
+			Shell_Print("Set PID tunings (x10): Kp: %d, Ki: %d, Kd: %d", (int)kp, (int)ki, (int)kd);
+			break;
+		}
+
+		case 'f':
+		case 'F': {
+			if (argc < 3) {
+				Shell_Print("\r\n>> Use temp -f <ffCoee*10>");
+				return;
+			}
+			int32_t ffCoee = atoi(argv[2]);
+			TempCtrl_SetFeedforwardCoee((float)ffCoee / 10.0f);
+			Shell_Print("Set feedforward coefficient (x10): %d", (int)ffCoee);
+			break;
+		}
+
+		case 'p':
+		case 'P': {
+			/* Open-loop bench drive, for looking at the switching noise on a
+			 * scope. 0 and 100 are the two static cases (no edges at all). */
+			if (argc < 3) {
+				Shell_Print("\r\n>> Use temp -p <duty 0~100 %%>");
+				return;
+			}
+			int32_t duty = atoi(argv[2]);
+			if (duty < 0) duty = 0;
+			if (duty > 100) duty = 100;
+			TempCtrl_RawPwm((uint16_t)duty);
+			Shell_Print("Closed loop OFF, peltier PWM forced to %d %% at %lu Hz",
+						(int)duty, (unsigned long)TempCtrl_GetPwmFreq());
+			break;
+		}
+
+		case 'w':
+		case 'W': {
+			if (argc < 3) {
+				Shell_Print("\r\n>> Use temp -w <freq Hz>");
+				return;
+			}
+			int32_t hz = atoi(argv[2]);
+			if (hz < 0) hz = 0;
+			uint32_t actual = TempCtrl_SetPwmFreq((uint32_t)hz);
+			Shell_Print("Peltier PWM frequency: %lu Hz (requested %d)",
+						(unsigned long)actual, (int)hz);
+			break;
+		}
+
 		default:
 			Shell_Print("\r\n>> %s", tempCmdHelp);
 			break;
@@ -697,6 +771,60 @@ static DebugCommand_t LEDCtrlCmd = {"led", ledCmdHelp, LEDControlCommand};
 
 
 
+
+/* --- Modbus link diagnostics ---------------------------------------------
+ * "mb -i" tells a dead link apart from a noisy one: errCode carries the OR of
+ * every HAL_UART_ERROR_* seen, so FE/NE point at line noise while ORE points at
+ * the DMA/interrupt path being held off. RxState 0x22 = BUSY_RX = armed.
+ * ------------------------------------------------------------------------*/
+static const char mbCmdHelp[] = "Modbus link diagnostics, Use mb -i/c";
+
+static void MbDiagCommand(int argc, char *argv[])
+{
+	if (argc < 2 || argv[1][0] != '-') {
+		Shell_Print("\r\n>> %s", mbCmdHelp);
+		return;
+	}
+
+	MB_SlaveDiag_t d;
+
+	switch (argv[1][1]) {
+		case 'i':
+		case 'I':
+			MB_Slave_GetDiag(&d);
+			Shell_Print("MB slave: rxEvt=%lu processed=%lu valid=%lu RxState=0x%02X%s",
+						(unsigned long)d.rxEvtCount, (unsigned long)d.processCount,
+						(unsigned long)d.validCount, d.rxState,
+						(d.rxState == (uint8_t)HAL_UART_STATE_BUSY_RX) ? " (armed)" : " (NOT ARMED)");
+			Shell_Print("\r\n   err=%lu code=0x%02lX [%s%s%s%s] rearmFail=%lu wdRearm=%lu",
+						(unsigned long)d.errCount, (unsigned long)d.errCode,
+						(d.errCode & HAL_UART_ERROR_ORE) ? "ORE " : "",
+						(d.errCode & HAL_UART_ERROR_FE)  ? "FE "  : "",
+						(d.errCode & HAL_UART_ERROR_NE)  ? "NE "  : "",
+						(d.errCode & HAL_UART_ERROR_PE)  ? "PE "  : "",
+						(unsigned long)d.rearmFail, (unsigned long)d.wdRearm);
+			{
+				uint32_t mErr = 0, mCode = 0;
+				MB_Master_GetDiag(&mErr, &mCode);
+				Shell_Print("\r\n   master: err=%lu code=0x%02lX",
+							(unsigned long)mErr, (unsigned long)mCode);
+			}
+			break;
+
+		case 'c':
+		case 'C':
+			MB_Slave_ClearDiag();
+			Shell_Print("MB diagnostics cleared");
+			break;
+
+		default:
+			Shell_Print("\r\n>> %s", mbCmdHelp);
+			break;
+	}
+}
+
+static const DebugCommand_t mbCmd = {"mb", mbCmdHelp, MbDiagCommand};
+
 void registerDebugCommands(void)
 {
 	bool ret;
@@ -764,6 +892,13 @@ void registerDebugCommands(void)
 		LOG_INFO("Register led command OK");
 	} else {
 		LOG_WARNING("Register led command FAILED");
+	}
+
+	ret = Shell_RegisterCommand(&mbCmd);
+	if (ret) {
+		LOG_INFO("Register mb command OK");
+	} else {
+		LOG_WARNING("Register mb command FAILED");
 	}
 }
 

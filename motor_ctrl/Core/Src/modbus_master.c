@@ -13,6 +13,11 @@
 
 static MB_MasterCtx_t mbMaster;
 
+/* Master link error counters, reported by the "mb -i" shell command. */
+static volatile uint32_t mbMasterErrCount = 0;
+static volatile uint32_t mbMasterErrCode  = 0;
+
+
 /* Thread flags signalled to the task waiting inside ExecuteTransaction. */
 #define MB_MASTER_RESP_FLAG     0x01U   /* response frame received (RX IDLE)  */
 #define MB_MASTER_TXCPLT_FLAG   0x02U   /* request frame fully transmitted    */
@@ -340,3 +345,26 @@ void MB_Master_StartTask(void)
 }
 
 
+/**
+ * @brief UART error handler for the Master link.
+ * Must be called from HAL_UART_ErrorCallback() for the master UART.
+ *
+ * Only clears the error - ExecuteTransaction() re-arms the RX DMA at the start
+ * of every transaction, so restarting it here would race with the next request.
+ */
+void MB_UART_HandleError(UART_HandleTypeDef *huart)
+{
+	if (mbMaster.huart == NULL || huart->Instance != mbMaster.huart->Instance) {
+		return;
+	}
+	mbMasterErrCount++;
+	mbMasterErrCode |= huart->ErrorCode;
+	__HAL_UART_CLEAR_PEFLAG(huart);
+	huart->ErrorCode = HAL_UART_ERROR_NONE;
+}
+
+void MB_Master_GetDiag(uint32_t *errCount, uint32_t *errCode)
+{
+	if (errCount) *errCount = mbMasterErrCount;
+	if (errCode)  *errCode  = mbMasterErrCode;
+}

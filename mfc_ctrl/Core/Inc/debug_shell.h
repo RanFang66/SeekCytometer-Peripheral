@@ -61,6 +61,7 @@ bool Shell_RegisterCommands(const DebugCommand_t *cmds, size_t count);
 
 /* Interrupt Callback - Call this from HAL_UART_RxCpltCallback */
 void Shell_UartRecvCallBack(UART_HandleTypeDef *huart);
+void Shell_UartErrorCallBack(UART_HandleTypeDef *huart);
 
 /* Macros for fast logging */
 #define LOG_DEBUG(...)    Shell_LogPrint(LOG_LEVEL_DEBUG, __func__, __LINE__, __VA_ARGS__)

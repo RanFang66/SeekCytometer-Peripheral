@@ -29,8 +29,13 @@ void PID_Init(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau, f
 	pid->prev_error = 0.0f;
 	pid->prev_prev_error = 0.0f;
 	pid->prev_output = 0.0f;
+	pid->u_fb = 0.0f;
 	pid->deltaD_f = 0.0f;
 	pid->last_delta_u = 0.0f;
+	pid->dbg_dP = 0.0f;
+	pid->dbg_dI = 0.0f;
+	pid->dbg_dD = 0.0f;
+	pid->dbg_ff = 0.0f;
 }
 
 void PID_SetTunings(PID_HandleTypeDef *pid, float Kp, float Ki, float Kd, float tau, float feedforwardCoee)
@@ -48,6 +53,7 @@ void PID_SetOutputLimits(PID_HandleTypeDef *pid, float out_min, float out_max)
 	pid->out_min = out_min;
 	pid->out_max = out_max;
 	pid->prev_output = clampf(pid->prev_output, out_min, out_max);
+	pid->u_fb = clampf(pid->u_fb, out_min, out_max);
 }
 
 void PID_SetStepLimits(PID_HandleTypeDef *pid, float step_min, float step_max)
@@ -64,8 +70,13 @@ void PID_Reset(PID_HandleTypeDef *pid)
 	pid->prev_error = 0.0f;
 	pid->prev_prev_error = 0.0f;
 	pid->prev_output = 0.0f;
+	pid->u_fb = 0.0f;
 	pid->deltaD_f = 0.0f;
 	pid->last_delta_u = 0.0f;
+	pid->dbg_dP = 0.0f;
+	pid->dbg_dI = 0.0f;
+	pid->dbg_dD = 0.0f;
+	pid->dbg_ff = 0.0f;
 }
 
 /*
@@ -74,8 +85,18 @@ void PID_Reset(PID_HandleTypeDef *pid)
    ΔI = Ki * e[k] * dt
    ΔD_raw = Kd * (e[k] - 2e[k-1] + e[k-2]) / dt
   derivative is low-pass filtered: deltaD_f = deltaD_f_prev + alpha*(deltaD_raw - deltaD_f_prev)
+
+  The increments accumulate into pid->u_fb only. The feed-forward is a static
+  offset for the current operating point, so it is added once at output time:
+
+      u = clamp(u_fb + ff)
+
+  Adding ff to the increment instead (u = prev_output + delta + ff, with
+  prev_output already containing the previous ff) would re-apply it every cycle
+  and make u monotonically increasing whenever ff > -step_min - the output then
+  pins at out_max and can never come back down.
 */
-float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float environmentTemp, float dt)
+float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float feedforward, float dt)
 {
     if (dt <= 0.0f) {
         return pid->prev_output;
@@ -86,10 +107,7 @@ float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float 
     float deltaP = pid->Kp * (error - pid->prev_error);
     float deltaI = pid->Ki * error * dt;
 
-    float deltaD_raw = 0.0f;
-    if (dt > 0.0f) {
-        deltaD_raw = pid->Kd * (error - 2.0f*pid->prev_error + pid->prev_prev_error) / dt;
-    }
+    float deltaD_raw = pid->Kd * (error - 2.0f*pid->prev_error + pid->prev_prev_error) / dt;
 
     /* Limit derivative */
     float max_abs_deltaD = pid->step_max * 3.0f;
@@ -102,33 +120,21 @@ float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float 
         deltaD_f = pid->deltaD_f + alpha * (deltaD_raw - pid->deltaD_f);
     }
 
+    /* Feed-forward: static offset, never accumulated */
+    float ff = clampf(feedforward, pid->out_min, pid->out_max);
 
-    float tentative_delta_raw = deltaP + deltaI + deltaD_f;
+    /* Limit step increment, then accumulate into the feedback state */
+    float delta = clampf(deltaP + deltaI + deltaD_f, pid->step_min, pid->step_max);
+    pid->u_fb += delta;
 
-    /* Conditional integral */
-    if ((pid->prev_output >= pid->out_max && deltaI > 0.0f) ||
-        (pid->prev_output <= pid->out_min && deltaI < 0.0f)) {
-        deltaI = 0.0f;
-        tentative_delta_raw = deltaP + deltaI + deltaD_f;
-    }
-
-
-
-    /* Limit step increment */
-    float tentative_delta = clampf(tentative_delta_raw, pid->step_min, pid->step_max);
-    float tentative_u = pid->prev_output + tentative_delta;
-
-
-    /* feed forward calculate */
-	float feedforward = 0.0;
-	if (environmentTemp > setpoint) {
-		feedforward = pid->feedforwardCoee * (environmentTemp - setpoint);
-	}
-
-
+    /* Back-calculation anti-windup: bound the state itself to the headroom left
+     * by the feed-forward. While the output is saturated u_fb stops at
+     * (out_max - ff) instead of winding past it, so the moment the error changes
+     * sign the P and I terms pull u_fb - and the output - straight back down. */
+    pid->u_fb = clampf(pid->u_fb, pid->out_min - ff, pid->out_max - ff);
 
     /* Limit output */
-    float u = clampf((tentative_u + feedforward), pid->out_min, pid->out_max);
+    float u = clampf(pid->u_fb + ff, pid->out_min, pid->out_max);
 
     /* Update states */
     pid->last_delta_u = u - pid->prev_output;
@@ -136,6 +142,12 @@ float PID_Compute(PID_HandleTypeDef *pid, float setpoint, float feedback, float 
     pid->prev_error = error;
     pid->prev_output = u;
     pid->deltaD_f = deltaD_f;
+
+    /* Diagnostics snapshot */
+    pid->dbg_dP = deltaP;
+    pid->dbg_dI = deltaI;
+    pid->dbg_dD = deltaD_f;
+    pid->dbg_ff = ff;
 
     return u;
 }

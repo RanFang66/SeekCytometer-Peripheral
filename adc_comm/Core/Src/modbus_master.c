@@ -15,6 +15,11 @@ static MB_MasterCtx_t mbMotor;
 static MB_MasterCtx_t mbMFC;
 static MB_MasterCtx_t mbPZT;
 
+/* Master link error counters, reported by the "mb -i" shell command. */
+static volatile uint32_t mbMasterErrCount = 0;
+static volatile uint32_t mbMasterErrCode  = 0;
+
+
 /* Thread flags signalled to the task waiting inside ExecuteTransaction. */
 #define MB_MASTER_RESP_FLAG     0x01U   /* response frame received (RX IDLE)  */
 #define MB_MASTER_TXCPLT_FLAG   0x02U   /* request frame fully transmitted    */
@@ -396,4 +401,32 @@ void MB_Master_StartTasks(void)
 	};
 	mbPZT.taskHandle = osThreadNew(MB_Master_Task, (void*)&mbPZT, &mbPZTTask_attributes);
 
+}
+
+
+/**
+ * @brief UART error handler for the three Master links.
+ * Must be called from HAL_UART_ErrorCallback().
+ *
+ * Only clears the error - ExecuteTransaction() re-arms the RX DMA at the start
+ * of every transaction, so restarting it here would race with the next request.
+ */
+void MB_UART_HandleError(UART_HandleTypeDef *huart)
+{
+	MB_MasterCtx_t *ctxList[3] = {&mbMotor, &mbMFC, &mbPZT};
+	for (int i = 0; i < 3; i++) {
+		if (ctxList[i]->huart != NULL && huart->Instance == ctxList[i]->huart->Instance) {
+			mbMasterErrCount++;
+			mbMasterErrCode |= huart->ErrorCode;
+			__HAL_UART_CLEAR_PEFLAG(huart);
+			huart->ErrorCode = HAL_UART_ERROR_NONE;
+			return;
+		}
+	}
+}
+
+void MB_Master_GetDiag(uint32_t *errCount, uint32_t *errCode)
+{
+	if (errCount) *errCount = mbMasterErrCount;
+	if (errCode)  *errCode  = mbMasterErrCode;
 }

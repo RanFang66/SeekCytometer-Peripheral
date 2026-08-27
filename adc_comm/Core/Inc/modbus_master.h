@@ -47,4 +47,9 @@ void MB_UART_HandleRxEvent(UART_HandleTypeDef *huart, uint16_t size);
 /* For called in HAL_UART_TxCpltCallback() */
 void MB_UART_HandleTxCplt(UART_HandleTypeDef *huart);
 
+// Must be called from HAL_UART_ErrorCallback() for the master UART(s).
+void MB_UART_HandleError(UART_HandleTypeDef *huart);
+void MB_Master_GetDiag(uint32_t *errCount, uint32_t *errCode);
+
+
 #endif /* INC_MODBUS_MASTER_H_ */

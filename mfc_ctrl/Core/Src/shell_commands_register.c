@@ -6,6 +6,7 @@
  */
 
 #include "debug_shell.h"
+#include "modbus_slave.h"
 #include <stdlib.h>
 
 #include "propo_valve_drive.h"
@@ -229,6 +230,54 @@ static const  DebugCommand_t pressCmd = {"press", pressCmdHelp, pressCommand};
 
 
 
+
+/* --- Modbus link diagnostics ---------------------------------------------
+ * "mb -i" tells a dead link apart from a noisy one: errCode carries the OR of
+ * every HAL_UART_ERROR_* seen, so FE/NE point at line noise while ORE points at
+ * the DMA/interrupt path being held off. RxState 0x22 = BUSY_RX = armed.
+ * ------------------------------------------------------------------------*/
+static const char mbCmdHelp[] = "Modbus link diagnostics, Use mb -i/c";
+
+static void MbDiagCommand(int argc, char *argv[])
+{
+	if (argc < 2 || argv[1][0] != '-') {
+		Shell_Print("\r\n>> %s", mbCmdHelp);
+		return;
+	}
+
+	MB_SlaveDiag_t d;
+
+	switch (argv[1][1]) {
+		case 'i':
+		case 'I':
+			MB_Slave_GetDiag(&d);
+			Shell_Print("MB slave: rxEvt=%lu processed=%lu valid=%lu RxState=0x%02X%s",
+						(unsigned long)d.rxEvtCount, (unsigned long)d.processCount,
+						(unsigned long)d.validCount, d.rxState,
+						(d.rxState == (uint8_t)HAL_UART_STATE_BUSY_RX) ? " (armed)" : " (NOT ARMED)");
+			Shell_Print("\r\n   err=%lu code=0x%02lX [%s%s%s%s] rearmFail=%lu wdRearm=%lu",
+						(unsigned long)d.errCount, (unsigned long)d.errCode,
+						(d.errCode & HAL_UART_ERROR_ORE) ? "ORE " : "",
+						(d.errCode & HAL_UART_ERROR_FE)  ? "FE "  : "",
+						(d.errCode & HAL_UART_ERROR_NE)  ? "NE "  : "",
+						(d.errCode & HAL_UART_ERROR_PE)  ? "PE "  : "",
+						(unsigned long)d.rearmFail, (unsigned long)d.wdRearm);
+			break;
+
+		case 'c':
+		case 'C':
+			MB_Slave_ClearDiag();
+			Shell_Print("MB diagnostics cleared");
+			break;
+
+		default:
+			Shell_Print("\r\n>> %s", mbCmdHelp);
+			break;
+	}
+}
+
+static const DebugCommand_t mbCmd = {"mb", mbCmdHelp, MbDiagCommand};
+
 void registerDebugCommands(void)
 {
 	bool ret;
@@ -251,6 +300,13 @@ void registerDebugCommands(void)
 		LOG_INFO("Register press command OK");
 	} else {
 		LOG_WARNING("Register press command FAILED");
+	}
+
+	ret = Shell_RegisterCommand(&mbCmd);
+	if (ret) {
+		LOG_INFO("Register mb command OK");
+	} else {
+		LOG_WARNING("Register mb command FAILED");
 	}
 }
 

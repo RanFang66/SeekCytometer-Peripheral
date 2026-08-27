@@ -269,11 +269,13 @@ void MB_CommandParse(void)
 			TempCtrl_Stop();
 			break;
 		case TEMP_CTRL_CMD_START:
-			TempCtrl_Start(tempTargetSet);
+			/* The register carries the target in 0.1 degC steps (same scaling the
+			 * status registers report back with) - the HMI sends val*10. */
+			TempCtrl_Start((float)(int16_t)tempTargetSet / 10.0f);
 			break;
 
 		case TEMP_CTRL_SET_TARGET:
-			TempCtrl_SetTarget(tempTargetSet);
+			TempCtrl_SetTarget((float)(int16_t)tempTargetSet / 10.0f);
 			break;
 
 		case TEMP_CTRL_FAN_SET:
