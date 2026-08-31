@@ -28,6 +28,7 @@
 /* USER CODE BEGIN Includes */
 #include "board_config.h"
 #include "bsp_uart.h"
+#include "app.h"
 
 /* USER CODE END Includes */
 
@@ -104,6 +105,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
+  App_Init();
 
   /* USER CODE END 2 */
 
@@ -117,6 +119,7 @@ int main(void)
     /* 喂狗。MX_IWDG_Init() 已经把看门狗跑起来了，主循环里少了这一句
      * 板子就每 2 s 复位一次。 */
     HAL_IWDG_Refresh(&hiwdg);
+    App_Tick(HAL_GetTick());
   }
   /* USER CODE END 3 */
 }
