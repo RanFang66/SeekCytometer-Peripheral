@@ -15,6 +15,7 @@ typedef int shell_commands_translation_unit_not_empty_t;
 #include "debug_shell.h"
 #include "bsp_tim.h"
 #include "tlc5957.h"
+#include "iwdg.h"
 
 /* Linker-provided RAM layout symbols, see STM32F030F4PX_FLASH.ld */
 extern uint32_t _sdata, _edata, _sbss, _ebss, _estack;
@@ -57,8 +58,20 @@ static void SysCommand(int argc, char *argv[])
                     resetCause());
         Shell_Print("SYSCLK=%lu Hz  uptime=%lus",
                     (unsigned long)SystemCoreClock, (unsigned long)up);
-        Shell_Print("GCLK=%lu Hz  refresh=%lu Hz",
-                    (unsigned long)TLC_GCLK_HZ, (unsigned long)TLC_REFRESH_HZ);
+        /* Read the timer back rather than trusting TLC_GCLK_HZ: that constant
+         * goes stale the moment anyone retunes TIM14, and during bring-up
+         * that is exactly what happens. */
+        {
+            uint32_t tclk = HAL_RCC_GetPCLK1Freq();
+            uint32_t psc  = TLC_GCLK_TIM.Instance->PSC + 1U;
+            uint32_t arr  = TLC_GCLK_TIM.Instance->ARR + 1U;
+            uint32_t ccr  = TLC_GCLK_TIM.Instance->CCR1;
+            uint32_t gclk = tclk / psc / arr;
+            Shell_Print("GCLK=%lu Hz duty=%lu%%  refresh=%lu Hz",
+                        (unsigned long)gclk,
+                        (unsigned long)(arr ? (ccr * 100U / arr) : 0U),
+                        (unsigned long)(gclk / 65536U));
+        }
         Shell_Print("RAM static=%luB  stack free>=%luB",
                     (unsigned long)staticRam, (unsigned long)stackRsv);
         break;
@@ -112,7 +125,7 @@ static void LedCommand(int argc, char *argv[])
     long a, b, c, d;
 
     if (argc < 2 || argv[1][0] != '-') {
-        Shell_Print("Use led -c/-r/-w/-n/-f/-z");
+        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-d");
         return;
     }
 
@@ -206,6 +219,63 @@ static void LedCommand(int argc, char *argv[])
         break;
     }
 
+
+    /* led -k <nops> : SCLK half-period delay. The board's parasitics turned a
+     * 12 MHz GCLK into a near-sine, so the bit-bang rate is suspect too.
+     * Sweep this from fast to slow while watching for the first light. */
+    case 'k':
+        if (argc < 3) { Shell_Print("sclk delay = %u nops", TLC5957_GetSclkDelay()); return; }
+        if (!argNum(argv[2], 0, 255, &a)) return;
+        TLC5957_SetSclkDelay((uint8_t)a);
+        Shell_Print("sclk delay = %ld nops", a);
+        break;
+
+    /* led -e <N> : command used for the LAST GS word. 3 = LATGS (datasheet
+     * step 3), 7 = LINERESET (step 6, used for the last group of a frame).
+     * This board is a single-line display, so every frame is also the last
+     * line - which of the two actually starts the display is an open question. */
+    case 'e':
+        if (argc < 3) { Shell_Print("last word cmd N = %u", TLC5957_GetLastWordCmd()); return; }
+        if (!argNum(argv[2], 1, TLC_WORD_BITS, &a)) return;
+        TLC5957_SetLastWordCmd((uint8_t)a);
+        Shell_Print("last word cmd N = %ld", a);
+        break;
+
+    /* led -t <ms> : hammer the current shadow out continuously.
+     * If the strip lights only while this runs, the image is not persisting and
+     * the answer is XREFRESH / auto display repeat, not the serial protocol. */
+    case 't': {
+        uint32_t t0, cnt = 0;
+        if (argc < 3) { Shell_Print("led -t <ms>"); return; }
+        if (!argNum(argv[2], 1, 60000, &a)) return;
+        t0 = HAL_GetTick();
+        while ((HAL_GetTick() - t0) < (uint32_t)a) {
+            TLC5957_Flush();
+            cnt++;
+            HAL_IWDG_Refresh(&hiwdg);
+        }
+        Shell_Print("flushed %lu times in %ld ms", (unsigned long)cnt, a);
+        break;
+    }
+
+    /* led -p <ms> : slow square wave on SCLK/SIN/LAT for scoping. */
+    case 'p':
+        if (argc < 3) { Shell_Print("led -p <ms>"); return; }
+        if (!argNum(argv[2], 1, 60000, &a)) return;
+        Shell_Print("wiggling SCLK(1ms) SIN(2ms) LAT(4ms) for %ld ms", a);
+        TLC5957_PinWiggle((uint32_t)a);
+        Shell_Print("done");
+        break;
+
+    /* led -d : dump the tunables */
+    case 'd':
+        Shell_Print("sclkDelay=%u lastWordCmd=%u layout=%s",
+                    TLC5957_GetSclkDelay(), TLC5957_GetLastWordCmd(),
+                    (TLC_GS_LAYOUT == TLC_GS_LAYOUT_BITPLANE) ? "BITPLANE" : "CHANNEL");
+        Shell_Print("WRTGS=%u LATGS=%u WRTFC=%u LINERESET=%u",
+                    TLC_CMD_WRTGS, TLC_CMD_LATGS, TLC_CMD_WRTFC, TLC_CMD_LINERESET);
+        break;
+
     /* led -z : blank everything */
     case 'z':
         TLC5957_Clear();
@@ -214,14 +284,14 @@ static void LedCommand(int argc, char *argv[])
         break;
 
     default:
-        Shell_Print("Use led -c/-r/-w/-n/-f/-z");
+        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-d");
         break;
     }
 }
 
 static const DebugCommand_t boardCommands[] = {
     {"sys", "System info, use sys -i/-r", SysCommand},
-    {"led", "TLC5957, use led -c/-r/-w/-n/-f/-z", LedCommand},
+    {"led", "TLC5957, use led -d for options", LedCommand},
 };
 
 void registerDebugCommands(void)

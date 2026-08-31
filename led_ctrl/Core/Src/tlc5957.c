@@ -32,6 +32,24 @@
 /* Channel-indexed shadow. 48 x 2 = 96 bytes. */
 static uint16_t gsShadow[TLC_CHANNELS];
 
+static uint8_t sclkDelay    = TLC_SCLK_DELAY_DEFAULT;
+static uint8_t lastWordCmd  = TLC_LASTWORD_CMD_DEFAULT;
+
+/* Deliberately a counted NOP loop rather than a DWT/timer delay: it has to work
+ * with interrupts on, it must not depend on any peripheral, and the exact
+ * frequency does not matter - only that it is slow enough for the board. */
+static inline void sclk_delay(void)
+{
+    for (uint8_t k = sclkDelay; k != 0U; k--) {
+        __NOP();
+    }
+}
+
+void TLC5957_SetSclkDelay(uint8_t nops)  { sclkDelay = nops; }
+uint8_t TLC5957_GetSclkDelay(void)       { return sclkDelay; }
+void TLC5957_SetLastWordCmd(uint8_t n)   { lastWordCmd = n; }
+uint8_t TLC5957_GetLastWordCmd(void)     { return lastWordCmd; }
+
 /* ------------------------------------------------------------------------ */
 
 uint16_t TLC5957_GsBitIndex(uint8_t ch, uint8_t weight)
@@ -76,7 +94,9 @@ static void tlc_write48(const uint8_t data[6], uint8_t latN)
             LAT_HI();
         }
 
+        sclk_delay();
         SCLK_HI();      /* rising edge: SIN sampled, command edge counted */
+        sclk_delay();
         SCLK_LO();
     }
 
@@ -143,7 +163,7 @@ void TLC5957_FlushRaw(const uint8_t raw[TLC_GS_BYTES])
 {
     for (uint8_t w = 0; w < TLC_GS_WORDS; w++) {
         const uint8_t *word = &raw[w * (TLC_WORD_BITS / 8U)];
-        tlc_write48(word, (w == TLC_GS_WORDS - 1U) ? TLC_CMD_LATGS
+        tlc_write48(word, (w == TLC_GS_WORDS - 1U) ? lastWordCmd
                                                    : TLC_CMD_WRTGS);
     }
 }
@@ -186,4 +206,29 @@ void TLC5957_WriteFC(const uint8_t fc[6])
 
     tlc_write48(zeros, TLC_CMD_FCWRTEN);    /* unlock */
     tlc_write48(fc, TLC_CMD_WRTFC);         /* write  */
+}
+
+/**
+ * @brief Drive the three lines with a slow square wave so they can be scoped.
+ *
+ * SCLK and SIN toggle every millisecond, LAT every four, so all three are
+ * distinguishable on one trace. This answers the most basic question a dark
+ * strip raises: do the pins actually move, and do they reach valid levels at
+ * the far end of the trace? VIH is 0.7 x VCC = 2.31 V here, VCC being 3.3 V.
+ */
+void TLC5957_PinWiggle(uint32_t ms)
+{
+    uint32_t start = HAL_GetTick();
+    uint32_t n = 0;
+
+    while ((HAL_GetTick() - start) < ms) {
+        if (n & 1U) { SCLK_HI(); } else { SCLK_LO(); }
+        if (n & 2U) { SIN_HI();  } else { SIN_LO();  }
+        if (n & 4U) { LAT_HI();  } else { LAT_LO();  }
+        n++;
+        HAL_Delay(1);
+    }
+    SCLK_LO();
+    SIN_LO();
+    LAT_LO();
 }

@@ -82,6 +82,29 @@
 #define TLC_CH_B(led)   ((uint8_t)(3U * (led) + 2U))
 #endif
 
+/* ---- Bring-up knobs --------------------------------------------------
+ * The board turned out to have enough parasitic capacitance on these lines
+ * that a 12 MHz GCLK on PB1 degenerated into something close to a sine wave.
+ * The bit-bang loop free-runs at roughly 4 MHz, which is in the same risk
+ * region, so SCLK is slowed down by default and made adjustable at runtime
+ * ("led -k"). At 1 MHz a full 768-bit refresh still only costs 770 us.
+ *
+ * The final GS word is likewise adjustable ("led -e"). LATGS is what the
+ * datasheet's step 3 prescribes, but its step 6 uses LINERESET for the last
+ * group of a frame, and this board is a single-line display where every frame
+ * IS the last line. Which one actually starts the display is an S3 question. */
+#define TLC_SCLK_DELAY_DEFAULT      12U     /* NOPs per SCLK half period */
+#define TLC_LASTWORD_CMD_DEFAULT    TLC_CMD_LATGS
+
+void TLC5957_SetSclkDelay(uint8_t nops);
+uint8_t TLC5957_GetSclkDelay(void);
+void TLC5957_SetLastWordCmd(uint8_t latN);
+uint8_t TLC5957_GetLastWordCmd(void);
+
+/* Slow square wave on SCLK / SIN / LAT so the lines can be scoped for level
+ * and edge quality. Blocks for the requested duration. */
+void TLC5957_PinWiggle(uint32_t ms);
+
 /* ---- API ------------------------------------------------------------- */
 
 /* Idles the three lines and blanks the GS latch. GCLK must already be running:
