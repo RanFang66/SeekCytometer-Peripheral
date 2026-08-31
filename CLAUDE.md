@@ -4,17 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository layout
 
-Five independent programs, one per physical board plus the PC HMI. There is no top-level build.
+Six independent programs, one per physical board plus the PC HMI. There is no top-level build.
 
 | Dir | Target | Role |
 |---|---|---|
-| `adc_comm/` | STM32F405RGT6, FreeRTOS | Signal sampling (PMT gain/reference DACs) **and Modbus gateway** between the PC and the other three boards |
+| `adc_comm/` | STM32F405RGT6, FreeRTOS | Signal sampling (PMT gain/reference DACs) **and Modbus gateway** between the PC and the other four boards |
 | `motor_ctrl/` | STM32F407VET6, FreeRTOS | Cover/seal/churn motors, X/Y/Z steppers, lasers, LED, temperature + fans |
 | `mfc_ctrl/` | STM32F405RGT6, FreeRTOS | Microfluidic pressure control (5 channels), solenoid + proportional valves |
 | `PZT/` | STM32F405RGT6, **bare-metal** | PZT auto-press: 2 step motors, DC-DC drive voltage, current/quantity checks. Uses FreeMODBUS (`Core/Src/modbus/`), not the hand-written stack |
+| `led_ctrl/` | STM32F030F4P6, **bare-metal** | CS_LED_Ctrl V1.0: 14 RGB LEDs via a bit-banged TLC5957, door-lock solenoid + feedback. **The only project with two build configurations** — see Build |
 | `SeekCytometer_Peripheral/` | Qt 6 Widgets (CMake) | PC HMI, Modbus-RTU master over serial |
 
-`reference/` holds datasheets (DAC8568, AD5724R).
+`reference/` holds datasheets (DAC8568, AD5724R, TLC5957) and board schematics.
+Design and planning documents for `led_ctrl` live outside this repo, under `../doc/design/`.
 
 ## Build
 
@@ -26,6 +28,20 @@ Five independent programs, one per physical board plus the PC HMI. There is no t
 export PATH="/opt/st/stm32cubeide_2.0.0/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.13.3.rel1.linux64_1.0.100.202509120712/tools/bin:$PATH"
 make -C adc_comm/Debug all -j8      # same for motor_ctrl, mfc_ctrl, PZT
 ```
+
+`led_ctrl` is the exception: it has no `Debug/`. The STM32F030F4P6 has one USART,
+so the debug shell and the Modbus slave cannot coexist and are selected by
+`-DUSART1_ROLE=` in two configurations, both `-Os`:
+
+```bash
+make -C led_ctrl/Debug_Shell all -j8    # USART1_ROLE=1, bench bring-up
+make -C led_ctrl/Debug_Modbus all -j8   # USART1_ROLE=2, what ships
+```
+
+16 KB of Flash is the binding constraint on `Debug_Shell`; run
+`arm-none-eabi-size` after any change to it. No floating point, no `malloc`, no
+`printf` — `debug_shell.c` carries its own minimal formatter, because reaching
+newlib's stdio pulls in about 4.5 KB.
 
 From a clean clone (no `Debug/`), generate them headlessly:
 
@@ -59,6 +75,7 @@ The PC HMI talks to **only one slave address, `0x11` (adc_comm)**, over Modbus-R
 | 40101–40200 | motor_ctrl | 0x22 |
 | 40201–40300 | mfc_ctrl | 0x33 |
 | 40301–40400 | PZT | 0x44 |
+| 40401–40500 | led_ctrl | 0x55 |
 
 A request must not straddle a block boundary — `adc_comm/Core/Src/modbus_slave.c` returns `TARGET_INVALID` (illegal-data-address exception) if it does.
 
@@ -84,9 +101,10 @@ Boards are not commanded by writing a value and having it take effect. Each bloc
 
 Each board has a `Core/Inc/bsp_uart.h` mapping roles to HAL handles — read it before touching UART code.
 
-- `adc_comm`: huart2 shell, huart6 ↔ PC, huart5 ↔ motor, huart1 ↔ MFC, huart4 ↔ PZT
+- `adc_comm`: huart3 shell (PB10/PB11), huart6 ↔ PC, huart5 ↔ motor, huart1 ↔ MFC, huart4 ↔ PZT, **huart2 ↔ led_ctrl** (huart2/PA2/PA3 used to be the shell; it was moved so the LED board could have a link)
 - `motor_ctrl`: huart1 shell, huart3 ↔ adc_comm (slave), huart4 → stepper drivers (**it is a Modbus master here**, CiA402-style register map in `Core/Inc/stepper_motor_protocol.h`)
 - `mfc_ctrl`: huart2 shell, huart1 ↔ adc_comm
+- `led_ctrl`: huart1 is **either** the shell **or** the Modbus slave, never both
 - `PZT`: FreeMODBUS at 115200, shell on huart2
 
 ### FreeRTOS task startup
