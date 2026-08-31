@@ -9,7 +9,11 @@
 #define INC_SAMPLE_CONTROL_H_
 
 #include "dac8568.h"
-#include "ad5724r.h"
+
+/* ad5724r.h is deliberately not included any more. CS_ADC_Ctrl V1.4 replaced
+ * the two AD5724R reference DACs with a single DAC8568 (U4, SYNC# on CS2/PC4),
+ * wired exactly like the gain DAC. The AD5724R driver stays in the tree for
+ * the V1.3 boards; nothing in the V1.4 firmware calls it. */
 
 
 //#define CHANNEL_NUM (8)	// 8 sample channels
@@ -49,8 +53,7 @@ typedef struct {
 
 typedef struct {
 	dac8568_channel_t gainCh;   // Gain DAC8568 channel
-	uint8_t           refChip;  // Reference AD5724R index (0 or 1)
-	ad5724r_channel_t refCh;    // Reference AD5724R channel (A..D)
+	dac8568_channel_t refCh;    // Reference DAC8568 channel
 	uint16_t gain;
 	uint16_t ref;
 } sample_para_t;
