@@ -9,6 +9,7 @@
 #include "board_config.h"
 #include "bsp_gpio.h"
 #include "bsp_tim.h"
+#include "tlc5957.h"
 #include "debug_shell.h"
 #include "shell_commands.h"
 
@@ -41,6 +42,10 @@ void App_Init(void)
 	 * while it does, and stopping it blanks the strip. This call moves into
 	 * TLC5957_Init() at M3, next to the FC write and the GS clear. */
 	HAL_TIM_PWM_Start(&TLC_GCLK_TIM, TLC_GCLK_PWM_CH);
+
+	/* GCLK first, then the driver: TLC5957_Init() ends with a LATGS, and the
+	 * device only acts on it while the grayscale clock is running. */
+	TLC5957_Init();
 
 	heartbeatLast = HAL_GetTick();
 

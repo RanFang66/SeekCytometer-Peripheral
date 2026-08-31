@@ -71,6 +71,12 @@ void Shell_LogPrint(LogLevel_t level, const char *func, int line, const char *fo
 void Shell_SetLogLevel(LogLevel_t level);
 LogLevel_t Shell_GetLogLevel(void);
 
+/* Number parsing. Deliberately not strtol()/atoi(): see the note on strtok in
+ * debug_shell.c - libc entry points that can reach __assert_func drag the whole
+ * stdio stack in behind them. Accepts decimal, 0x hex and a leading '-'.
+ * Returns false on a malformed string so callers can reject it. */
+bool Shell_ParseNum(const char *s, long *out);
+
 /* Command Registration */
 bool Shell_RegisterCommand(const DebugCommand_t *cmd);
 bool Shell_RegisterCommands(const DebugCommand_t *cmds, size_t count);

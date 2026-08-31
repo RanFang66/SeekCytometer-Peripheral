@@ -14,6 +14,7 @@ typedef int shell_commands_translation_unit_not_empty_t;
 
 #include "debug_shell.h"
 #include "bsp_tim.h"
+#include "tlc5957.h"
 
 /* Linker-provided RAM layout symbols, see STM32F030F4PX_FLASH.ld */
 extern uint32_t _sdata, _edata, _sbss, _ebss, _estack;
@@ -73,8 +74,154 @@ static void SysCommand(int argc, char *argv[])
     }
 }
 
+
+/* ---------------------------------------------------------------------------
+ * TLC5957 calibration and control
+ *
+ * "led -n" and "led -w" exist to settle what SLVSCQ4 does not document: the
+ * LAT edge count of each command and the bit order of the 768-bit GS latch.
+ * See tlc5957.h, the CALIBRATE sections.
+ * ------------------------------------------------------------------------- */
+
+static const struct { const char *name; uint8_t n; } tlcCmdTable[] = {
+    {"wrtgs",     TLC_CMD_WRTGS},
+    {"latgs",     TLC_CMD_LATGS},
+    {"wrtfc",     TLC_CMD_WRTFC},
+    {"linereset", TLC_CMD_LINERESET},
+    {"readfc",    TLC_CMD_READFC},
+    {"tmgrst",    TLC_CMD_TMGRST},
+    {"fcwrten",   TLC_CMD_FCWRTEN},
+};
+#define TLC_CMD_TABLE_LEN (sizeof(tlcCmdTable) / sizeof(tlcCmdTable[0]))
+
+static bool argNum(const char *s, long lo, long hi, long *out)
+{
+    if (!Shell_ParseNum(s, out)) {
+        Shell_Print("bad number: '%s'", s);
+        return false;
+    }
+    if (*out < lo || *out > hi) {
+        Shell_Print("out of range [%ld..%ld]: %ld", lo, hi, *out);
+        return false;
+    }
+    return true;
+}
+
+static void LedCommand(int argc, char *argv[])
+{
+    long a, b, c, d;
+
+    if (argc < 2 || argv[1][0] != '-') {
+        Shell_Print("Use led -c/-r/-w/-n/-f/-z");
+        return;
+    }
+
+    switch (argv[1][1]) {
+
+    /* led -c <ch 0..47> <gs 0..65535> : drive one channel */
+    case 'c':
+        if (argc < 4) { Shell_Print("led -c <ch> <gs>"); return; }
+        if (!argNum(argv[2], 0, TLC_CHANNELS - 1, &a)) return;
+        if (!argNum(argv[3], 0, 65535, &b)) return;
+        TLC5957_Clear();
+        TLC5957_SetChannel((uint8_t)a, (uint16_t)b);
+        TLC5957_Flush();
+        Shell_Print("ch%ld = %ld", a, b);
+        break;
+
+    /* led -r <led 0..13> <r> <g> <b> : drive one RGB LED, 0..65535 each */
+    case 'r':
+        if (argc < 6) { Shell_Print("led -r <led> <r> <g> <b>"); return; }
+        if (!argNum(argv[2], 0, TLC_LED_COUNT - 1, &a)) return;
+        if (!argNum(argv[3], 0, 65535, &b)) return;
+        if (!argNum(argv[4], 0, 65535, &c)) return;
+        if (!argNum(argv[5], 0, 65535, &d)) return;
+        TLC5957_Clear();
+        TLC5957_SetRGB((uint8_t)a, (uint16_t)b, (uint16_t)c, (uint16_t)d);
+        TLC5957_Flush();
+        Shell_Print("led%ld ch r=%u g=%u b=%u", a,
+                    TLC_CH_R((uint8_t)a), TLC_CH_G((uint8_t)a), TLC_CH_B((uint8_t)a));
+        break;
+
+    /* led -w <bit 0..767> : walk-a-one.
+     * Sets exactly one bit of the 768-bit GS stream and nothing else, so the
+     * output that lights identifies what that bit position drives. Bit 0 is
+     * the FIRST bit clocked out of the MCU. Sweep 0..767 and record the
+     * result; that table IS the answer to CALIBRATE 2 and 3. */
+    case 'w': {
+        static uint8_t raw[TLC_GS_BYTES];
+        if (argc < 3) { Shell_Print("led -w <bitIdx 0..767>"); return; }
+        if (!argNum(argv[2], 0, TLC_GS_TOTAL_BITS - 1, &a)) return;
+        for (uint16_t i = 0; i < TLC_GS_BYTES; i++) raw[i] = 0;
+        raw[a >> 3] = (uint8_t)(0x80U >> (a & 7U));
+        TLC5957_FlushRaw(raw);
+        /* Unsigned on purpose: a signed / or % here links __divsi3, 460 bytes
+         * of libgcc that nothing else on this board needs. The formatter
+         * already pays for the unsigned pair. */
+        unsigned bit = (unsigned)a;
+        Shell_Print("bit %u set (word %u, pos %u)", bit, bit / 48U, bit % 48U);
+        Shell_Print("hypothesis: ch%u weight%u",
+                    (TLC_GS_LAYOUT == TLC_GS_LAYOUT_BITPLANE)
+                        ? (TLC_CHANNELS - 1U - (bit % 48U))
+                        : (TLC_CHANNELS - 1U - (bit / 16U)),
+                    (TLC_GS_LAYOUT == TLC_GS_LAYOUT_BITPLANE)
+                        ? (TLC_GS_BITS - 1U - (bit / 48U))
+                        : (TLC_GS_BITS - 1U - (bit % 16U)));
+        break;
+    }
+
+    /* led -n <cmd> <N> [d0..d5] : send one command with an arbitrary LAT edge
+     * count. Use it to confirm each entry of the CALIBRATE 1 table: the value
+     * of N that makes the command actually take effect is the right one. */
+    case 'n': {
+        uint8_t data[6] = {0, 0, 0, 0, 0, 0};
+        if (argc < 4) {
+            Shell_Print("led -n <cmd> <N> [d0..d5]");
+            for (unsigned i = 0; i < TLC_CMD_TABLE_LEN; i++) {
+                Shell_Print("  %-9s N=%u", tlcCmdTable[i].name, tlcCmdTable[i].n);
+            }
+            return;
+        }
+        if (!argNum(argv[3], 1, TLC_WORD_BITS, &b)) return;
+        for (int i = 0; i < 6 && (4 + i) < argc; i++) {
+            if (!argNum(argv[4 + i], 0, 255, &c)) return;
+            data[i] = (uint8_t)c;
+        }
+        TLC5957_SendCommand((uint8_t)b, data);
+        Shell_Print("sent '%s' with N=%ld", argv[2], b);
+        break;
+    }
+
+    /* led -f <b0>..<b5> : FCWRTEN then WRTFC with six raw bytes.
+     * b0 is clocked out first, i.e. it holds FC bits 47..40. */
+    case 'f': {
+        uint8_t fc[6] = {0, 0, 0, 0, 0, 0};
+        if (argc < 8) { Shell_Print("led -f <b0> <b1> <b2> <b3> <b4> <b5>"); return; }
+        for (int i = 0; i < 6; i++) {
+            if (!argNum(argv[2 + i], 0, 255, &c)) return;
+            fc[i] = (uint8_t)c;
+        }
+        TLC5957_WriteFC(fc);
+        Shell_Print("FC written");
+        break;
+    }
+
+    /* led -z : blank everything */
+    case 'z':
+        TLC5957_Clear();
+        TLC5957_Flush();
+        Shell_Print("blanked");
+        break;
+
+    default:
+        Shell_Print("Use led -c/-r/-w/-n/-f/-z");
+        break;
+    }
+}
+
 static const DebugCommand_t boardCommands[] = {
     {"sys", "System info, use sys -i/-r", SysCommand},
+    {"led", "TLC5957, use led -c/-r/-w/-n/-f/-z", LedCommand},
 };
 
 void registerDebugCommands(void)

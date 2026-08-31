@@ -418,6 +418,42 @@ static int shell_tokenize(char *line, char **argv, int maxArgs)
     return argc;
 }
 
+
+/**
+ * @brief Parse a decimal or 0x-prefixed hex integer.
+ *
+ * Same reasoning as shell_tokenize(): newlib's strtol/atoi are avoided so that
+ * nothing in this file can pull __assert_func and the stdio stack in with it.
+ */
+bool Shell_ParseNum(const char *s, long *out)
+{
+    if (s == NULL || out == NULL || *s == '\0') return false;
+
+    int neg = 0;
+    if (*s == '-') { neg = 1; s++; }
+    else if (*s == '+') { s++; }
+
+    unsigned base = 10;
+    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) { base = 16; s += 2; }
+
+    if (*s == '\0') return false;
+
+    unsigned long v = 0;
+    while (*s) {
+        unsigned d;
+        if      (*s >= '0' && *s <= '9') d = (unsigned)(*s - '0');
+        else if (*s >= 'a' && *s <= 'f') d = (unsigned)(*s - 'a' + 10);
+        else if (*s >= 'A' && *s <= 'F') d = (unsigned)(*s - 'A' + 10);
+        else return false;
+        if (d >= base) return false;
+        v = v * base + d;
+        s++;
+    }
+
+    *out = neg ? -(long)v : (long)v;
+    return true;
+}
+
 static void ProcessCommand(char *line)
 {
     char *argv[SHELL_MAX_ARGS];
