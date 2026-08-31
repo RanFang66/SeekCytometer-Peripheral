@@ -43,6 +43,7 @@ typedef struct {
 	MB_MasterCtx_t *mbMotor;
 	MB_MasterCtx_t *mbMFC;
 	MB_MasterCtx_t *mbPZT;
+	MB_MasterCtx_t *mbLED;
 
 } MB_SlaveCtx_t;
 

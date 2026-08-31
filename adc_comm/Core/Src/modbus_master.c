@@ -14,6 +14,7 @@
 static MB_MasterCtx_t mbMotor;
 static MB_MasterCtx_t mbMFC;
 static MB_MasterCtx_t mbPZT;
+static MB_MasterCtx_t mbLED;
 
 /* Master link error counters, reported by the "mb -i" shell command. */
 static volatile uint32_t mbMasterErrCount = 0;
@@ -36,6 +37,8 @@ MB_MasterCtx_t *getMBMasterCtx(target_t target) {
 		return &mbMFC;
 	case TARGET_PZT:
 		return &mbPZT;
+	case TARGET_LED:
+		return &mbLED;
 	default:
 		return NULL;
 	}
@@ -66,7 +69,7 @@ static MB_Status_t MB_MasterInitHelper(target_t target, const char *name, UART_H
 }
 
 /**
- * @brief Initializes all three Modbus masters
+ * @brief Initializes all four Modbus masters
  */
 void MB_Master_Init()
 {
@@ -75,6 +78,7 @@ void MB_Master_Init()
 	MB_MasterInitHelper(TARGET_MFC, "mfcMB", &MB_MFC_UART_HANDLE, MB_MFC_ADDR);
     // CRITICAL FIX: Correctly initializes TARGET_PZT
 	MB_MasterInitHelper(TARGET_PZT, "pztMB", &MB_PZT_UART_HANDLE, MB_PZT_ADDR);
+	MB_MasterInitHelper(TARGET_LED, "ledMB", &MB_LED_UART_HANDLE, MB_LED_ADDR);
 }
 
 
@@ -337,6 +341,8 @@ void MB_UART_HandleRxEvent(UART_HandleTypeDef *huart, uint16_t size)
 		MB_UartRxCallback(&mbMFC, size);
 	} else if (huart == mbPZT.huart) {
 		MB_UartRxCallback(&mbPZT, size);
+	} else if (huart == mbLED.huart) {
+		MB_UartRxCallback(&mbLED, size);
 	}
 }
 
@@ -355,6 +361,8 @@ void MB_UART_HandleTxCplt(UART_HandleTypeDef *huart)
 		ctx = &mbMFC;
 	} else if (huart == mbPZT.huart) {
 		ctx = &mbPZT;
+	} else if (huart == mbLED.huart) {
+		ctx = &mbLED;
 	}
 	if (ctx != NULL && ctx->callingTaskHandle != NULL) {
 		osThreadFlagsSet(ctx->callingTaskHandle, MB_MASTER_TXCPLT_FLAG);
@@ -376,6 +384,12 @@ static void MB_Master_Task(void *argument)
 
 /**
  * @brief Starts the FreeRTOS tasks for all three masters
+ *
+ * No task is created for TARGET_LED, and none is needed: MB_Master_Task() only
+ * calls osDelay(100) forever, ctx->taskHandle is never read anywhere, and the
+ * transaction logic runs synchronously in the caller's context (see
+ * ExecuteTransaction, which waits on ctx->callingTaskHandle). Adding a fourth
+ * would cost 1-2 KB of stack to do nothing.
  */
 void MB_Master_StartTasks(void)
 {
@@ -405,7 +419,7 @@ void MB_Master_StartTasks(void)
 
 
 /**
- * @brief UART error handler for the three Master links.
+ * @brief UART error handler for the four Master links.
  * Must be called from HAL_UART_ErrorCallback().
  *
  * Only clears the error - ExecuteTransaction() re-arms the RX DMA at the start
@@ -413,8 +427,8 @@ void MB_Master_StartTasks(void)
  */
 void MB_UART_HandleError(UART_HandleTypeDef *huart)
 {
-	MB_MasterCtx_t *ctxList[3] = {&mbMotor, &mbMFC, &mbPZT};
-	for (int i = 0; i < 3; i++) {
+	MB_MasterCtx_t *ctxList[] = {&mbMotor, &mbMFC, &mbPZT, &mbLED};
+	for (unsigned i = 0; i < sizeof(ctxList) / sizeof(ctxList[0]); i++) {
 		if (ctxList[i]->huart != NULL && huart->Instance == ctxList[i]->huart->Instance) {
 			mbMasterErrCount++;
 			mbMasterErrCode |= huart->ErrorCode;

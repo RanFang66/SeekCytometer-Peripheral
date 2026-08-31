@@ -20,6 +20,7 @@
 #define  	MB_MOTOR_UART_HANDLE 			huart5				// uart for modbus communication with motor control
 #define 	MB_MFC_UART_HANDLE				huart1				// uart for modbus communication with MFC
 #define 	MB_PZT_UART_HANDLE				huart4				// uart for modbus communication with PZT
+#define 	MB_LED_UART_HANDLE				huart2				// uart for modbus communication with CS_LED_Ctrl
 
 
 

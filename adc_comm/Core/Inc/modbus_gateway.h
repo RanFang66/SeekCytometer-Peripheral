@@ -15,12 +15,14 @@
 #define MB_MOTOR_ADDR				(0x22)
 #define MB_MFC_ADDR					(0x33)
 #define MB_PZT_ADDR					(0x44)
+#define MB_LED_ADDR					(0x55)
 
 typedef enum {
 	TARGET_LOCAL = 0,
 	TARGET_MOTOR,
 	TARGET_MFC,
 	TARGET_PZT,
+	TARGET_LED,
 	TARGET_INVALID,
 } target_t;
 
@@ -41,6 +43,7 @@ typedef enum {
 #define MB_MOTOR_REG_START			(MB_LOCAL_REG_START + MB_REG_LOCAL_COUNT)
 #define MB_MFC_REG_START			(MB_MOTOR_REG_START + MB_REG_BLOCK_COUNT)
 #define MB_PZT_REG_START			(MB_MFC_REG_START + MB_REG_BLOCK_COUNT)
+#define MB_LED_REG_START			(MB_PZT_REG_START + MB_REG_BLOCK_COUNT)
 
 
 

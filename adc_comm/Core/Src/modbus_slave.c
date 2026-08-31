@@ -120,6 +120,11 @@ static target_t get_target_from_addr(uint16_t startAddr, uint16_t quantity)
         return TARGET_PZT;
     }
 
+    // Check LED / door-lock Block (CS_LED_Ctrl, slave 0x55)
+    if (startAddr >= MB_LED_REG_START && endAddr <= MB_LED_REG_START + MB_REG_BLOCK_COUNT - 1) {
+        return TARGET_LED;
+    }
+
     return TARGET_INVALID;
 }
 
@@ -385,6 +390,10 @@ void MB_Slave_Init()
 	mbSlave.mbMotor = getMBMasterCtx(TARGET_MOTOR);
 	mbSlave.mbMFC = getMBMasterCtx(TARGET_MFC);
 	mbSlave.mbPZT = getMBMasterCtx(TARGET_PZT);
+	// Note: these four references are currently unused - forwarding goes through
+	// MB_ReadHoldingRegs(target, ...) and friends, which look the context up
+	// themselves. Kept complete so the set does not look accidentally partial.
+	mbSlave.mbLED = getMBMasterCtx(TARGET_LED);
 
 	// 4. Start DMA reception
 	HAL_UARTEx_ReceiveToIdle_DMA(mbSlave.huart, mbSlave.rxDMABuffer, MB_SLAVE_RX_BUFFER_SIZE);
