@@ -23,6 +23,11 @@ Release/
 build/
 out/
 
+# led_ctrl 有两个 build configuration（USART1 双角色编译开关），
+# 见 doc/design/CS_LED_Lock_Ctrl_详细设计.md §5.3
+Debug_Shell/
+Debug_Modbus/
+
 # Generated binary files
 *.elf
 *.hex
