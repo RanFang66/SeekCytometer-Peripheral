@@ -125,7 +125,7 @@ static void LedCommand(int argc, char *argv[])
     long a, b, c, d;
 
     if (argc < 2 || argv[1][0] != '-') {
-        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-d");
+        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-l/-d");
         return;
     }
 
@@ -276,6 +276,17 @@ static void LedCommand(int argc, char *argv[])
                     TLC_CMD_WRTGS, TLC_CMD_LATGS, TLC_CMD_WRTFC, TLC_CMD_LINERESET);
         break;
 
+    /* led -l <sclk> <sin> <lat> : hold static levels for DMM probing at the
+     * chip pins. VIH is 0.7 x VCC = 2.31 V with VCC = 3.3 V. */
+    case 'l':
+        if (argc < 5) { Shell_Print("led -l <sclk> <sin> <lat>   (0/1 each)"); return; }
+        if (!argNum(argv[2], 0, 1, &a)) return;
+        if (!argNum(argv[3], 0, 1, &b)) return;
+        if (!argNum(argv[4], 0, 1, &c)) return;
+        TLC5957_SetPins(a != 0, b != 0, c != 0);
+        Shell_Print("SCLK=%ld SIN=%ld LAT=%ld (held)", a, b, c);
+        break;
+
     /* led -z : blank everything */
     case 'z':
         TLC5957_Clear();
@@ -284,7 +295,7 @@ static void LedCommand(int argc, char *argv[])
         break;
 
     default:
-        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-d");
+        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-l/-d");
         break;
     }
 }

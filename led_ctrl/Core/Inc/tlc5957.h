@@ -105,6 +105,11 @@ uint8_t TLC5957_GetLastWordCmd(void);
  * and edge quality. Blocks for the requested duration. */
 void TLC5957_PinWiggle(uint32_t ms);
 
+/* Hold the three lines at fixed levels. A multimeter at the chip pins is a
+ * better instrument than a scope for "is this output actually driving", and it
+ * does not depend on catching a 1.5 ms burst. */
+void TLC5957_SetPins(bool sclk, bool sin, bool lat);
+
 /* ---- API ------------------------------------------------------------- */
 
 /* Idles the three lines and blanks the GS latch. GCLK must already be running:

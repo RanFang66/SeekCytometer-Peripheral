@@ -232,3 +232,10 @@ void TLC5957_PinWiggle(uint32_t ms)
     SIN_LO();
     LAT_LO();
 }
+
+void TLC5957_SetPins(bool sclk, bool sin, bool lat)
+{
+    if (sclk) { SCLK_HI(); } else { SCLK_LO(); }
+    if (sin)  { SIN_HI();  } else { SIN_LO();  }
+    if (lat)  { LAT_HI();  } else { LAT_LO();  }
+}
