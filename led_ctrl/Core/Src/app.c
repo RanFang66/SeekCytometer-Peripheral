@@ -9,10 +9,13 @@
 #include "board_config.h"
 #include "bsp_gpio.h"
 #include "bsp_tim.h"
+#include "debug_shell.h"
+#include "shell_commands.h"
 
-/* 心跳翻转周期。500 ms 翻转 = 1 Hz 方波，示波器上周期应为 1.000 s。
- * SysTick 的重装值是 HAL 按 SystemCoreClock 算出来的，所以这个周期对不对，
- * 直接反映时钟树配得对不对 —— PLL 配错的话这里会成比例偏掉。 */
+/* Heartbeat toggle period. 500 ms toggle is a 1 Hz square wave, so the scope
+ * should read a 1.000 s period. SysTick's reload value is derived by the HAL
+ * from SystemCoreClock, so this period doubles as a clock-tree check: a
+ * misconfigured PLL shows up here as a proportional error. */
 #define HEARTBEAT_TOGGLE_MS		(500U)
 
 static uint32_t heartbeatLast;
@@ -20,9 +23,10 @@ static uint32_t heartbeatLast;
 void App_Init(void)
 {
 #ifdef BSP_HEARTBEAT_NEEDS_INIT
-	/* 兜底：PA9 已写进 .ioc，但当前这份生成代码早于那次改动，MX_GPIO_Init()
-	 * 还没配它。CubeMX 下次重新生成后 main.h 会给出 heartbeat_Pin，
-	 * BSP_HEARTBEAT_NEEDS_INIT 随之消失，这段自动编译掉，不用回头删。 */
+	/* Fallback: PA9 is in the .ioc, but this generated code predates that edit,
+	 * so MX_GPIO_Init() does not configure it yet. Once CubeMX regenerates,
+	 * main.h defines heartbeat_Pin, BSP_HEARTBEAT_NEEDS_INIT goes away and this
+	 * block compiles out on its own - nothing to delete later. */
 	GPIO_InitTypeDef gi = {0};
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	HAL_GPIO_WritePin(HEARTBEAT_PORT, HEARTBEAT_PIN, GPIO_PIN_RESET);
@@ -33,15 +37,26 @@ void App_Init(void)
 	HAL_GPIO_Init(HEARTBEAT_PORT, &gi);
 #endif
 
-	/* GCLK 必须常开：TLC5957 的灰度计数器靠它走，停了就是全屏灭。
-	 * M3 之后这句会挪进 TLC5957_Init()，那里还要接着写 FC 和清 GS。 */
+	/* GCLK must run continuously: the TLC5957 grayscale counter only advances
+	 * while it does, and stopping it blanks the strip. This call moves into
+	 * TLC5957_Init() at M3, next to the FC write and the GS clear. */
 	HAL_TIM_PWM_Start(&TLC_GCLK_TIM, TLC_GCLK_PWM_CH);
 
 	heartbeatLast = HAL_GetTick();
+
+#if USART1_ROLE == USART1_ROLE_SHELL
+	Shell_Init();
+	registerDebugCommands();
+	Shell_Start();
+#endif
 }
 
 void App_Tick(uint32_t now)
 {
+#if USART1_ROLE == USART1_ROLE_SHELL
+	Shell_Poll();
+#endif
+
 	if ((uint32_t)(now - heartbeatLast) >= HEARTBEAT_TOGGLE_MS) {
 		heartbeatLast = now;
 		HAL_GPIO_TogglePin(HEARTBEAT_PORT, HEARTBEAT_PIN);

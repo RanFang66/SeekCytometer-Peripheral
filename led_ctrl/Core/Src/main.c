@@ -89,10 +89,11 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-  /* IWDG 一旦启动就无法关闭。SWD 停在断点时它照样计数，所以必须先冻结，
-   * 否则单步调试全程被 2 s 复位打断。
-   * 注意 F0 上 DBGMCU 挂在 APB2，写 APB1FZ 之前必须先开它的时钟，
-   * 少了 CLK_ENABLE 这一句下面那句就是空操作 —— 而且不会有任何报错。 */
+  /* The IWDG cannot be stopped once started, and it keeps counting while SWD
+   * holds the core at a breakpoint, so freeze it before it ever runs or every
+   * single-step session gets cut short by a 2 s reset.
+   * On F0 the DBGMCU sits on APB2: without enabling its clock first, the write
+   * to APB1FZ below is a silent no-op - no error, no warning. */
   __HAL_RCC_DBGMCU_CLK_ENABLE();
   __HAL_DBGMCU_FREEZE_IWDG();
 
@@ -116,8 +117,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /* 喂狗。MX_IWDG_Init() 已经把看门狗跑起来了，主循环里少了这一句
-     * 板子就每 2 s 复位一次。 */
+    /* Kick the watchdog. MX_IWDG_Init() has already started it, so without
+     * this line the board resets every 2 s. */
     HAL_IWDG_Refresh(&hiwdg);
     App_Tick(HAL_GetTick());
   }

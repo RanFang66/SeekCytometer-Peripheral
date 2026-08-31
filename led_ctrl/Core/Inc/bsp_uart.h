@@ -13,8 +13,10 @@
 
 /* BSP USART Handle function definition
  *
- * 本板只有一个串口，它按 USART1_ROLE 扮演两种角色之一。两个宏刻意指向同一个句柄，
- * 是为了让上层代码读起来和另外四块板一致（那几块板上这是两条不同的物理链路）。 */
+ * This board has a single USART that plays one of two roles, selected by
+ * USART1_ROLE. Both macros deliberately resolve to the same handle so that
+ * upper layers read the same as on the other four boards, where these are two
+ * distinct physical links. */
 #if   USART1_ROLE == USART1_ROLE_SHELL
 #define		DEBUG_SHELL_UART_HANDLE		(huart1)	// uart for debug shell
 #elif USART1_ROLE == USART1_ROLE_MODBUS
