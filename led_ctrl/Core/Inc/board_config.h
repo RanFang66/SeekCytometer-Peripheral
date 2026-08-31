@@ -39,6 +39,16 @@
 #define CSLED_MB_SLAVE_ADDR		(0x55U)
 #define CSLED_MB_REG_START		(40401U)
 
+/* S3 calibration command set: "led -w/-n/-f/-k/-e/-t/-p/-l/-d", the tools that
+ * decode what SLVSCQ4 does not document. They are bench-only and they are the
+ * single largest block of code in the shell build, so they get their own gate:
+ * set this to 0 once the CALIBRATE sections of tlc5957.h are settled and the
+ * flash comes back for lock control and the Modbus port. "led -c/-r/-z" stay
+ * either way - driving one channel is a permanently useful thing to have. */
+#ifndef CSLED_SHELL_CALIB_CMDS
+#define CSLED_SHELL_CALIB_CMDS	1
+#endif
+
 /* Firmware version, read back through status register index 61 */
 #define CSLED_FW_VERSION		(0x0100U)	/* v1.00 */
 

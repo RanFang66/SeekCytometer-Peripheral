@@ -10,6 +10,7 @@
 #include "bsp_gpio.h"
 #include "bsp_tim.h"
 #include "tlc5957.h"
+#include "led_pattern.h"
 #include "debug_shell.h"
 #include "shell_commands.h"
 
@@ -47,6 +48,11 @@ void App_Init(void)
 	 * device only acts on it while the grayscale clock is running. */
 	TLC5957_Init();
 
+	/* Starts on scene OFF, so the engine renders one blank frame and then goes
+	 * quiet. That matters during S3: a running engine would fight the
+	 * calibration commands, and an idle one does not. */
+	LedPattern_Init();
+
 	heartbeatLast = HAL_GetTick();
 
 #if USART1_ROLE == USART1_ROLE_SHELL
@@ -61,6 +67,8 @@ void App_Tick(uint32_t now)
 #if USART1_ROLE == USART1_ROLE_SHELL
 	Shell_Poll();
 #endif
+
+	LedPattern_Tick(now);
 
 	if ((uint32_t)(now - heartbeatLast) >= HEARTBEAT_TOGGLE_MS) {
 		heartbeatLast = now;

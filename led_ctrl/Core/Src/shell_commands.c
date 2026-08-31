@@ -15,6 +15,7 @@ typedef int shell_commands_translation_unit_not_empty_t;
 #include "debug_shell.h"
 #include "bsp_tim.h"
 #include "tlc5957.h"
+#include "led_pattern.h"
 #include "iwdg.h"
 
 /* Linker-provided RAM layout symbols, see STM32F030F4PX_FLASH.ld */
@@ -96,6 +97,7 @@ static void SysCommand(int argc, char *argv[])
  * See tlc5957.h, the CALIBRATE sections.
  * ------------------------------------------------------------------------- */
 
+#if CSLED_SHELL_CALIB_CMDS
 static const struct { const char *name; uint8_t n; } tlcCmdTable[] = {
     {"wrtgs",     TLC_CMD_WRTGS},
     {"latgs",     TLC_CMD_LATGS},
@@ -106,6 +108,7 @@ static const struct { const char *name; uint8_t n; } tlcCmdTable[] = {
     {"fcwrten",   TLC_CMD_FCWRTEN},
 };
 #define TLC_CMD_TABLE_LEN (sizeof(tlcCmdTable) / sizeof(tlcCmdTable[0]))
+#endif
 
 static bool argNum(const char *s, long lo, long hi, long *out)
 {
@@ -120,14 +123,26 @@ static bool argNum(const char *s, long lo, long hi, long *out)
     return true;
 }
 
+#if CSLED_SHELL_CALIB_CMDS
+#define LED_USAGE   "led -c/-r/-z | S3: -w/-n/-f/-k/-e/-t/-p/-l/-d"
+#else
+#define LED_USAGE   "led -c <ch> <gs> | -r <led> <r> <g> <b> | -z"
+#endif
+
 static void LedCommand(int argc, char *argv[])
 {
     long a, b, c, d;
 
     if (argc < 2 || argv[1][0] != '-') {
-        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-l/-d");
+        Shell_Print(LED_USAGE);
         return;
     }
+
+    /* Every command below either writes the GS latch or changes the timing
+     * the engine depends on. Rendering on top of that would erase whatever is
+     * being measured 25 ms later, so calibration always wins: the engine stays
+     * down until "pat -s" brings it back. */
+    LedPattern_Suspend();
 
     switch (argv[1][1]) {
 
@@ -156,6 +171,7 @@ static void LedCommand(int argc, char *argv[])
                     TLC_CH_R((uint8_t)a), TLC_CH_G((uint8_t)a), TLC_CH_B((uint8_t)a));
         break;
 
+#if CSLED_SHELL_CALIB_CMDS
     /* led -w <bit 0..767> : walk-a-one.
      * Sets exactly one bit of the 768-bit GS stream and nothing else, so the
      * output that lights identifies what that bit position drives. Bit 0 is
@@ -287,6 +303,8 @@ static void LedCommand(int argc, char *argv[])
         Shell_Print("SCLK=%ld SIN=%ld LAT=%ld (held)", a, b, c);
         break;
 
+#endif /* CSLED_SHELL_CALIB_CMDS */
+
     /* led -z : blank everything */
     case 'z':
         TLC5957_Clear();
@@ -295,14 +313,121 @@ static void LedCommand(int argc, char *argv[])
         break;
 
     default:
-        Shell_Print("led -c/-r/-w/-n/-f/-z | diag: -k/-e/-t/-p/-l/-d");
+        Shell_Print(LED_USAGE);
         break;
+    }
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Pattern engine
+ *
+ * Separate from "led" on purpose. The led command is the S3 calibration tool
+ * and works on raw channels and raw protocol; pat works in scenes and colours.
+ * They also cannot share flag letters - "led -e" is already the last-word LAT
+ * command used by the S3 troubleshooting procedure, see
+ * doc/design/CS_LED_Lock_Ctrl_S3灯带不亮排查.md.
+ * ------------------------------------------------------------------------- */
+
+static const char *const effectNames[LED_EFFECT_COUNT] = {
+    "off", "solid", "breath", "blink", "chase", "wipe",
+};
+
+static void PatCommand(int argc, char *argv[])
+{
+    long a, b, c, d, e;
+
+    if (argc < 2 || argv[1][0] != '-') {
+        Shell_Print("pat -s <scene> | -e <eff> <r> <g> <b> <ms> | -2 <r> <g> <b> | -b <pct> | -i");
+        return;
+    }
+
+    switch (argv[1][1]) {
+
+    /* pat -s <0..9> : select a table scene. 9 (COMM_LOST) is reachable here
+     * but not over Modbus - the shell is a bench tool, and being able to look
+     * at the scene without unplugging the gateway is the point. */
+    case 's':
+        if (argc < 3) { Shell_Print("pat -s <scene 0..%u>", LED_SCENE_COUNT - 1U); return; }
+        if (!argNum(argv[2], 0, LED_SCENE_COUNT - 1, &a)) return;
+        LedPattern_SetScene((uint8_t)a);
+        break;
+
+    /* pat -e <eff> <r> <g> <b> <period_ms> : manual override.
+     * Colours are 0..255 perceptual values; the square-law gamma is applied
+     * downstream, so 128 really does look like half brightness. */
+    case 'e': {
+        led_scene_t s = *LedPattern_GetActive();
+        if (argc < 7) {
+            Shell_Print("pat -e <eff> <r> <g> <b> <period_ms>");
+            for (unsigned i = 0; i < LED_EFFECT_COUNT; i++) {
+                Shell_Print("  %u = %s", i, effectNames[i]);
+            }
+            return;
+        }
+        if (!argNum(argv[2], 0, LED_EFFECT_COUNT - 1, &a)) return;
+        if (!argNum(argv[3], 0, 255, &b)) return;
+        if (!argNum(argv[4], 0, 255, &c)) return;
+        if (!argNum(argv[5], 0, 255, &d)) return;
+        if (!argNum(argv[6], 0, 65535, &e)) return;
+        s.effect = (uint8_t)a;
+        s.r = (uint8_t)b; s.g = (uint8_t)c; s.b = (uint8_t)d;
+        s.period_ms = (uint16_t)e;
+        LedPattern_SetManual(&s);
+        break;
+    }
+
+    /* pat -2 <r> <g> <b> : secondary colour, the background CHASE and WIPE
+     * draw over. Kept apart from -e so a chase colour can be tuned without
+     * retyping the whole line. */
+    case '2': {
+        led_scene_t s = *LedPattern_GetActive();
+        if (argc < 5) { Shell_Print("pat -2 <r> <g> <b>"); return; }
+        if (!argNum(argv[2], 0, 255, &a)) return;
+        if (!argNum(argv[3], 0, 255, &b)) return;
+        if (!argNum(argv[4], 0, 255, &c)) return;
+        s.r2 = (uint8_t)a; s.g2 = (uint8_t)b; s.b2 = (uint8_t)c;
+        LedPattern_SetManual(&s);
+        break;
+    }
+
+    /* pat -b <0..100> : brightness, applied on top of the running scene
+     * without restarting it. */
+    case 'b':
+        if (argc < 3) { Shell_Print("pat -b <0..100>"); return; }
+        if (!argNum(argv[2], 0, 100, &a)) return;
+        LedPattern_SetBrightness((uint8_t)a);
+        break;
+
+    case 'i':
+        break;
+
+    default:
+        Shell_Print("pat -s/-e/-2/-b/-i");
+        return;
+    }
+
+    /* Every accepted command ends by printing the resulting state, so there is
+     * no separate "did that take" step during the S4 walkthrough. */
+    {
+        const led_scene_t *s = LedPattern_GetActive();
+        uint8_t sc = LedPattern_GetScene();
+        if (sc == LED_SCENE_MANUAL_ID) {
+            Shell_Print("scene=manual  eff=%s  %s", effectNames[s->effect],
+                        LedPattern_IsRunning() ? "running" : "suspended");
+        } else {
+            Shell_Print("scene=%u  eff=%s  %s", sc, effectNames[s->effect],
+                        LedPattern_IsRunning() ? "running" : "suspended");
+        }
+        Shell_Print("c1=%u,%u,%u  c2=%u,%u,%u", s->r, s->g, s->b, s->r2, s->g2, s->b2);
+        Shell_Print("bri=%u%%  period=%ums", s->brightness, s->period_ms);
     }
 }
 
 static const DebugCommand_t boardCommands[] = {
     {"sys", "System info, use sys -i/-r", SysCommand},
     {"led", "TLC5957, use led -d for options", LedCommand},
+    {"pat", "LED scenes, use pat -i for state", PatCommand},
 };
 
 void registerDebugCommands(void)
