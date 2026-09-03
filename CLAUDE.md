@@ -91,6 +91,30 @@ Keep the HMI's `#define` names and the firmware's `MB_Slave_DefineReg` indices i
 
 Boards are not commanded by writing a value and having it take effect. Each block has a **control word at index 0** (bitfield, one bit per subsystem: cover/seal/churn/temp/stepper/laser/LED, see `CtrlWord_t` in `motor_ctrl/Core/Src/modbus_local_table.c`) plus per-subsystem `*_CMD` / `*_DATA` registers. The HMI writes CMD + DATA first, then toggles the control-word bit; `MB_CommandParse()` fires on the **0→1 edge** (`ctrlWord != lastCtrlWord`) and dispatches to the owning module. Status flows back through separate read-only registers (roughly index 47+), updated by `MB_UpdateStatus()`.
 
+### Parameter persistence (mfc_ctrl only)
+
+`mfc_ctrl` is the one board that keeps tuned parameters across a power cycle. The five
+pressure channels' Kp/Ki/feed-forward live in `Core/Src/param_store.c`, which uses
+**flash sector 11 (`0x080E0000`, 128 KB) as an append-only journal of 64-byte records**.
+
+- A save writes one record into the next free slot — no erase, so the CPU stalls for
+  under 2 ms. The sector is only erased when it fills, and `ParamStore_Init()`
+  deliberately pulls that erase forward to boot time (the F405 is single-bank, so an
+  erase stalls *everything*, interrupts included, for 1–2 s — unacceptable while the
+  pressure loop and Modbus are running).
+- Saving is automatic: `PressCtrl_SetPI()` marks the cache dirty and the write happens
+  1 s later, from the pressure-control task. **Flash is only ever written from that
+  task** — that single-writer rule is what lets the module do without a mutex, so don't
+  call `ParamStore_Tick()` from anywhere else.
+- `STM32F405RGTX_FLASH.ld` declares FLASH as **896K, not 1024K**, so a firmware that
+  grows into the parameter sector fails to link instead of silently overwriting it.
+  Don't "fix" it back to 1024K.
+- **Flashing caveat:** an ST-LINK "full chip erase" wipes the stored parameters. Use
+  "erase sectors used by application" for normal downloads.
+
+`PZT/Core/Src/flash.c` is an older, unused take on the same idea; it is dead code and
+its sector guard contradicts its own `PARAM_STORE_ADDR`. Don't copy it.
+
 ### Timing constraints that are easy to break
 
 - Gateway transaction timeout is 200 ms (`MB_DEFAULT_TIMEOUT_MS`), deliberately below the HMI's 1000 ms timeout and 400 ms poll period so a dead sub-board yields an exception rather than a pile-up. Changing any one of the three means checking the other two.

@@ -107,12 +107,17 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  /* First: PressCtrl_Init() reads the stored PI parameters out of flash, and on
+   * the rare boot where it has to compact the parameter sector that erase
+   * stalls the whole CPU for up to 2 s. Doing it before the UARTs are armed
+   * keeps that stall away from the Modbus link. */
+  PressCtrl_Init();
+
   Shell_Init();
   MB_Slave_Init();
   HSC_Init();
   PropoValveDrive_Init();
   SOL_Init();
-  PressCtrl_Init();
   registerDebugCommands();
 
 

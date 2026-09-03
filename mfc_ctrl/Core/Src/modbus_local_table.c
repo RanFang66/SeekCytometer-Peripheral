@@ -10,6 +10,7 @@
 #include "propo_valve_drive.h"
 #include "sol_valve_control.h"
 #include "press_control.h"
+#include "param_store.h"
 
 
 typedef union {
@@ -47,6 +48,7 @@ static uint16_t feedforward;
 static uint16_t kp[PRESS_CTRL_CH_NUM];
 static uint16_t ki[PRESS_CTRL_CH_NUM];
 static uint16_t ff[PRESS_CTRL_CH_NUM];
+static uint16_t paramStoreStatus;
 
 
 
@@ -110,6 +112,8 @@ void MB_Local_RegInit(void)
 	MB_Slave_DefineReg(85, &ki[4]);
 	MB_Slave_DefineReg(86, &ff[4]);
 
+	MB_Slave_DefineReg(87, &paramStoreStatus);
+
 }
 
 void MB_UpdateStatus(void)
@@ -141,6 +145,7 @@ void MB_UpdateCtrlParas(void)
 		ki[i] = (uint16_t)(PressCtrl_GetKi(i) * 100.0);
 		ff[i] = (uint16_t)(PressCtrl_GetFF(i));
 	}
+	paramStoreStatus = ParamStore_GetStatus();
 }
 
 void MB_CommandParse(void)

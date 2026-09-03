@@ -14,6 +14,7 @@
 #include "hsc_spi.h"
 #include "hsc_conv.h"
 #include "press_control.h"
+#include "param_store.h"
 
 static const char propoValveCmdHelp[] = "Proportional valve control, Usage: propo -s/d/a/i <id> <value>";
 
@@ -276,6 +277,73 @@ static void MbDiagCommand(int argc, char *argv[])
 	}
 }
 
+
+static const char paramCmdHelp[] = "Param store command, Usage: param -i/s/d/e";
+
+static void paramCommand(int argc, char *argv[])
+{
+	if (argc < 2 || argv[1][0] != '-') {
+		Shell_Print(paramCmdHelp);
+		return;
+	}
+
+	switch (argv[1][1]) {
+	case 'i':
+	case 'I': {
+		uint16_t status = ParamStore_GetStatus();
+		const ParamRecord_t *rec = ParamStore_GetCached();
+
+		Shell_Print("\r\n>> Param store: %s%s%s%s%s",
+				(status & PARAM_ST_LOADED)     ? "LOADED "    : "",
+				(status & PARAM_ST_DEFAULTS)   ? "DEFAULTS "  : "",
+				(status & PARAM_ST_DIRTY)      ? "DIRTY "     : "",
+				(status & PARAM_ST_SAVE_ERROR) ? "SAVE_ERR "  : "",
+				(status & PARAM_ST_COMPACTED)  ? "COMPACTED " : "");
+		Shell_Print("\r\n>> seq: %lu, slots used: %u/%u (%u%%)",
+				(unsigned long)ParamStore_GetSeq(), ParamStore_GetUsedSlots(),
+				(unsigned)PARAM_SLOT_COUNT, (unsigned)(status >> 8));
+		for (uint8_t i = 0; i < PRESS_CTRL_CH_NUM; i++) {
+			Shell_Print("\r\n>> Ch-%d: Kp %u.%02u, Ki %u.%02u, FF %u",
+					i,
+					rec->kp_x100[i] / 100U, rec->kp_x100[i] % 100U,
+					rec->ki_x100[i] / 100U, rec->ki_x100[i] % 100U,
+					rec->ff[i]);
+		}
+		break;
+	}
+
+	case 's':
+	case 'S':
+		/* Only raises a request: the pressure task owns the flash. */
+		ParamStore_RequestSave();
+		Shell_Print("\r\n>> Save requested");
+		break;
+
+	case 'd':
+	case 'D':
+		/* Goes through the normal command path, so the debounced save picks it
+		 * up like any change from the HMI. */
+		PressCtrl_SetPI(PRESS_CH_ALL,
+				(uint16_t)(PRESS_CTRL_DEFAULT_KP * 100.0f),
+				(uint16_t)(PRESS_CTRL_DEFAULT_KI * 100.0f),
+				(uint16_t)PRESS_CTRL_DEFAULT_FEEDFORWARD);
+		Shell_Print("\r\n>> Defaults applied to all channels");
+		break;
+
+	case 'e':
+	case 'E':
+		ParamStore_RequestErase();
+		Shell_Print("\r\n>> Erase requested, defaults will be used after reset");
+		break;
+
+	default:
+		Shell_Print("\r\n>> %s", paramCmdHelp);
+		break;
+	}
+}
+
+static const DebugCommand_t paramCmd = {"param", paramCmdHelp, paramCommand};
+
 static const DebugCommand_t mbCmd = {"mb", mbCmdHelp, MbDiagCommand};
 
 void registerDebugCommands(void)
@@ -307,6 +375,13 @@ void registerDebugCommands(void)
 		LOG_INFO("Register mb command OK");
 	} else {
 		LOG_WARNING("Register mb command FAILED");
+	}
+
+	ret = Shell_RegisterCommand(&paramCmd);
+	if (ret) {
+		LOG_INFO("Register param command OK");
+	} else {
+		LOG_WARNING("Register param command FAILED");
 	}
 }
 

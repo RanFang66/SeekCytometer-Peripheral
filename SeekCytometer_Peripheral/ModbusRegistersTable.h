@@ -114,6 +114,12 @@
 #define MFC_PRESS_TARGET_CH5            MFC_REG_ADDR(71)
 #define MFC_KP_CH1                      MFC_REG_ADDR(72)
 
+// Parameter-store status, read-only. Low byte: bit0 loaded from flash,
+// bit1 running on build defaults, bit2 unsaved change pending,
+// bit3 last write failed, bit4 sector compacted this boot.
+// High byte: percentage of journal slots used.
+#define MFC_PARAM_STORE_STATUS          MFC_REG_ADDR(87)
+
 #define PZT_CW                          PZT_REG_ADDR(0)
 #define PZT_MOTOR1_SPEED_SET            PZT_REG_ADDR(1)
 #define PZT_MOTOR2_SPEED_SET            PZT_REG_ADDR(2)

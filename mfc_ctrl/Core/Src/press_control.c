@@ -13,6 +13,7 @@
 #include "sol_valve_control.h"
 #include "hsc_spi.h"
 #include "hsc_conv.h"
+#include "param_store.h"
 
 static PressCtrlCtx_t pressCtrl[PRESS_CTRL_CH_NUM];
 static osThreadId_t pressCtrlThread = NULL;
@@ -31,12 +32,26 @@ static inline bool isChEnable(uint8_t ch, uint8_t chSet)
 
 void PressCtrl_Init()
 {
+	/* Recover the tuned PI parameters from flash before the loop is built. The
+	 * cache is filled with the compile-time defaults when nothing valid is
+	 * stored, so there is only one code path below. */
+	ParamStore_Init();
+	const ParamRecord_t *stored = ParamStore_GetCached();
+
 	for (uint8_t i = 0; i < PRESS_CTRL_CH_NUM; i++) {
 		PID_Init(&pressCtrl[i].pid, PRESS_CTRL_DEFAULT_KP, PRESS_CTRL_DEFAULT_KI, PRESS_CTRL_DEFAULT_KD,
 				PRESS_CTRL_DEFAULT_TAU,
 				PRESS_CTRL_DEFAULT_OUT_MIN, PRESS_CTRL_DEFAULT_OUT_MAX,
 				PRESS_CTRL_DEFAULT_STEP_MIN, PRESS_CTRL_DEFAULT_STEP_MAX,
 				PRESS_CTRL_DEFAULT_FEEDFORWARD);
+
+		/* PID_Init sets up the limits and filter constants; only Kp/Ki/FF are
+		 * persisted, and they are decoded exactly as the Modbus path does. */
+		PID_SetPIParas(&pressCtrl[i].pid,
+				(float)stored->kp_x100[i] / 100.0f,
+				(float)stored->ki_x100[i] / 100.0f,
+				(float)stored->ff[i]);
+
 		pressCtrl[i].state = PRESS_CTRL_IDLE;
 		pressCtrl[i].target = 0;
 	}
@@ -129,6 +144,8 @@ static void PressCtrl_StateMachine(PressCtrlCmd_t cmd)
 
 		case PRESS_CTRL_SET_PI:
 			PID_SetPIParas(&pressCtrl[i].pid, cmd.kp, cmd.ki, cmd.feedforward);
+			/* Arm the debounced save with the host's own integers. */
+			ParamStore_UpdateChannel(i, cmd.kp_x100, cmd.ki_x100, cmd.ff_raw);
 			break;
 
 		case PRESS_CTRL_RESET:
@@ -173,6 +190,10 @@ static void PressCtrl_Task(void *arg)
 
 		PressCtrl_Update();
 
+		/* Flash is only ever written from this task, which is what makes the
+		 * parameter store safe without a mutex. */
+		ParamStore_Tick(osKernelGetTickCount());
+
 		osDelay(150);
 	}
 }
@@ -206,6 +227,9 @@ void PressCtrl_SetPI(uint8_t ch, uint16_t kp_x100, uint16_t ki_x100, uint16_t ff
 	cmd.kp = (float)kp_x100 / 100.0;
 	cmd.ki = (float)ki_x100 / 100.0;
 	cmd.feedforward = (float)ff;
+	cmd.kp_x100 = kp_x100;
+	cmd.ki_x100 = ki_x100;
+	cmd.ff_raw = ff;
 	if (osMessageQueuePut(pressCtrlCmdQueue, &cmd, 0, 100) != osOK) {
 		LOG_WARNING("Send set press PI parameters target command FAILED!");
 	}

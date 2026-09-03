@@ -65,6 +65,12 @@ typedef struct {
 	float			kp;
 	float 			ki;
 	float			feedforward;
+	/* The same PI parameters in the raw on-wire encoding the HMI sent. They are
+	 * carried alongside the floats so that what gets stored in flash is the
+	 * host's own integers, with no float round-trip. See param_store.h. */
+	uint16_t		kp_x100;
+	uint16_t		ki_x100;
+	uint16_t		ff_raw;
 } PressCtrlCmd_t;
 
 
