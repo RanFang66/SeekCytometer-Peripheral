@@ -8,6 +8,7 @@
 #ifndef INC_STEPPER_MOTOR_CONTROL_H_
 #define INC_STEPPER_MOTOR_CONTROL_H_
 
+#include <stdbool.h>
 #include "modbus_master.h"
 
 #define STEPPER_MOTOR_NUM		(3)
@@ -43,6 +44,9 @@ typedef struct {
 	int32_t  	motorPos;
 	uint16_t	limitStatus;
 	uint32_t 	errorCode;
+	/* Set once the drive has confirmed PP mode + Operation Enabled. A move to an
+	 * axis with this clear is refused until the setup has been redone. */
+	uint8_t		ppReady;
 } SMotorCtrlCtx_t;
 
 
@@ -72,5 +76,6 @@ char SMotorCtrl_GetName(SMotorIndex_t id);
 uint16_t SMotorCtrl_GetStatus(SMotorIndex_t id);
 int32_t SMotorCtrl_GetPos(SMotorIndex_t id);
 uint16_t SMotorCtrl_GetLimitStatus(SMotorIndex_t id);
+bool SMotorCtrl_IsReady(SMotorIndex_t id);
 
 #endif /* INC_STEPPER_MOTOR_CONTROL_H_ */

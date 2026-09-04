@@ -304,7 +304,8 @@ void MB_CommandParse(void)
 	}
 
 	if (ctrlWord.bits.SMotorCtrl && !lastCtrlWord.bits.SMotorCtrl) {
-		// bit8: if set will enable the collision avoidance feature will enable, that is when x, y motor runs z motor position must be less then 20000
+		// bit7: enables collision avoidance -- an X/Y traverse first retracts Z
+		// clear of them (see SMOTOR_Z_SAFE_POS in stepper_motor_control.c)
 		uint8_t enCollisionAvoid = (motorCmd & 0x0080) >> 7;
 		uint8_t cmdType = motorCmd & 0x007F;
 		uint8_t id = (motorCmd >> 8) & 0x00FF;

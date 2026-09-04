@@ -620,8 +620,9 @@ static void SMotorControlCommand(int argc, char *argv[])
 
 		case 'i':
 		case 'I':
-			Shell_Print("Motor-%c: Status: %d, Pos: %d, Limit Status: %d",
-						SMotorCtrl_GetName(id), SMotorCtrl_GetStatus(id), SMotorCtrl_GetPos(id), SMotorCtrl_GetLimitStatus(id));
+			Shell_Print("Motor-%c: Status: 0x%04X, Pos: %d, Limit Status: %d, PP ready: %d",
+						SMotorCtrl_GetName(id), SMotorCtrl_GetStatus(id), SMotorCtrl_GetPos(id),
+						SMotorCtrl_GetLimitStatus(id), SMotorCtrl_IsReady(id));
 			break;
 
 
